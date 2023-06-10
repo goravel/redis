@@ -33,10 +33,9 @@ import (
 "stores": map[string]any{
     ...
     "redis": map[string]any{
-        "driver":     "custom",
-        "connection": "default",
+        "driver": "custom",
         "via": func() (cache.Driver, error) {
-            return redisfacades.Redis("redis"), nil
+            return redisfacades.Redis("default"), nil
         },
     },
 },
