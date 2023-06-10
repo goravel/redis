@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -14,14 +15,15 @@ import (
 )
 
 type Redis struct {
-	ctx        context.Context
-	config     config.Config
-	prefix     string
-	instance   *redis.Client
-	connection string
+	ctx      context.Context
+	config   config.Config
+	prefix   string
+	instance *redis.Client
+	store    string
 }
 
-func NewRedis(ctx context.Context, config config.Config, connection string) (*Redis, error) {
+func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, error) {
+	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
 	host := config.GetString("database.redis." + connection + ".host")
 	if host == "" {
 		return nil, nil
@@ -38,10 +40,10 @@ func NewRedis(ctx context.Context, config config.Config, connection string) (*Re
 	}
 
 	return &Redis{
-		ctx:        ctx,
-		connection: connection,
-		prefix:     config.GetString("cache.prefix") + ":",
-		instance:   client,
+		ctx:      ctx,
+		prefix:   config.GetString("cache.prefix") + ":",
+		instance: client,
+		store:    store,
 	}, nil
 }
 
@@ -247,7 +249,7 @@ func (r *Redis) RememberForever(key string, callback func() any) (any, error) {
 }
 
 func (r *Redis) WithContext(ctx context.Context) cache.Driver {
-	store, _ := NewRedis(ctx, r.config, r.connection)
+	store, _ := NewRedis(ctx, r.config, r.store)
 
 	return store
 }

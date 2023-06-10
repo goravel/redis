@@ -8,13 +8,13 @@ import (
 	"github.com/goravel/redis"
 )
 
-func Redis(connection string) cache.Driver {
-	if connection == "" {
-		log.Fatalln("connection is required")
+func Redis(store string) cache.Driver {
+	if store == "" {
+		log.Fatalln("store is required")
 		return nil
 	}
 
-	instance, err := redis.App.MakeWith(redis.Binding, map[string]any{"connection": connection})
+	instance, err := redis.App.MakeWith(redis.Binding, map[string]any{"store": store})
 	if err != nil {
 		log.Fatalln(err)
 		return nil

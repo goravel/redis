@@ -17,7 +17,7 @@ func (receiver *ServiceProvider) Register(app foundation.Application) {
 	App = app
 
 	app.BindWith(Binding, func(app foundation.Application, parameters map[string]any) (any, error) {
-		return NewRedis(context.Background(), app.MakeConfig(), parameters["connection"].(string))
+		return NewRedis(context.Background(), app.MakeConfig(), parameters["store"].(string))
 	})
 }
 

@@ -34,8 +34,9 @@ import (
     ...
     "redis": map[string]any{
         "driver": "custom",
+        "connection": "default",
         "via": func() (cache.Driver, error) {
-            return redisfacades.Redis("default"), nil
+            return redisfacades.Redis("redis"), nil
         },
     },
 },
