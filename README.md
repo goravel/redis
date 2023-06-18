@@ -1,6 +1,12 @@
 # Redis
 
-A redis disk driver for facades.Cache() of Goravel.
+A redis disk driver for `facades.Cache()` of Goravel.
+
+## Version
+
+| goravel/redis  | goravel/framework    |
+| ----------     | --------------       |
+| v1.0.0         | v1.12.0              |
 
 ## Install
 

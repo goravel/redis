@@ -14,6 +14,8 @@ import (
 	"github.com/goravel/framework/contracts/config"
 )
 
+var _ cache.Driver = &Redis{}
+
 type Redis struct {
 	ctx      context.Context
 	config   config.Config
