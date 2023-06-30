@@ -26,15 +26,15 @@ type Redis struct {
 
 func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
-	host := config.GetString("database.redis." + connection + ".host")
+	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
 	if host == "" {
 		return nil, nil
 	}
 
 	client := redis.NewClient(&redis.Options{
-		Addr:     host + ":" + config.GetString("database.redis."+connection+".port"),
-		Password: config.GetString("database.redis." + connection + ".password"),
-		DB:       config.GetInt("database.redis." + connection + ".database"),
+		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
+		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
+		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	})
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
@@ -43,13 +43,13 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 
 	return &Redis{
 		ctx:      ctx,
-		prefix:   config.GetString("cache.prefix") + ":",
+		prefix:   fmt.Sprintf("%s:", config.GetString("cache.prefix")),
 		instance: client,
 		store:    store,
 	}, nil
 }
 
-//Add Driver an item in the cache if the key does not exist.
+// Add Driver an item in the cache if the key does not exist.
 func (r *Redis) Add(key string, value any, t time.Duration) bool {
 	val, err := r.instance.SetNX(r.ctx, r.key(key), value, t).Result()
 	if err != nil {
@@ -69,7 +69,7 @@ func (r *Redis) Decrement(key string, value ...int) (int, error) {
 	return int(res), err
 }
 
-//Forever Driver an item in the cache indefinitely.
+// Forever Driver an item in the cache indefinitely.
 func (r *Redis) Forever(key string, value any) bool {
 	if err := r.Put(key, value, 0); err != nil {
 		return false
@@ -78,14 +78,14 @@ func (r *Redis) Forever(key string, value any) bool {
 	return true
 }
 
-//Forget Remove an item from the cache.
+// Forget Remove an item from the cache.
 func (r *Redis) Forget(key string) bool {
 	_, err := r.instance.Del(r.ctx, r.key(key)).Result()
 
 	return err == nil
 }
 
-//Flush Remove all items from the cache.
+// Flush Remove all items from the cache.
 func (r *Redis) Flush() bool {
 	res, err := r.instance.FlushAll(r.ctx).Result()
 
@@ -96,7 +96,7 @@ func (r *Redis) Flush() bool {
 	return true
 }
 
-//Get Retrieve an item from the cache by key.
+// Get Retrieve an item from the cache by key.
 func (r *Redis) Get(key string, def ...any) any {
 	val, err := r.instance.Get(r.ctx, r.key(key)).Result()
 	if err != nil {
@@ -168,7 +168,7 @@ func (r *Redis) GetString(key string, def ...string) string {
 	return cast.ToString(r.Get(key, def[0]))
 }
 
-//Has Check an item exists in the cache.
+// Has Check an item exists in the cache.
 func (r *Redis) Has(key string) bool {
 	value, err := r.instance.Exists(r.ctx, r.key(key)).Result()
 
@@ -193,7 +193,7 @@ func (r *Redis) Lock(key string, t ...time.Duration) cache.Lock {
 	return NewLock(r, key, t...)
 }
 
-//Put Driver an item in the cache for a given time.
+// Put Driver an item in the cache for a given time.
 func (r *Redis) Put(key string, value any, t time.Duration) error {
 	err := r.instance.Set(r.ctx, r.key(key), value, t).Err()
 	if err != nil {
@@ -203,7 +203,7 @@ func (r *Redis) Put(key string, value any, t time.Duration) error {
 	return nil
 }
 
-//Pull Retrieve an item from the cache and delete it.
+// Pull Retrieve an item from the cache and delete it.
 func (r *Redis) Pull(key string, def ...any) any {
 	var res any
 	if len(def) == 0 {
@@ -216,15 +216,19 @@ func (r *Redis) Pull(key string, def ...any) any {
 	return res
 }
 
-//Remember Get an item from the cache, or execute the given Closure and store the result.
-func (r *Redis) Remember(key string, seconds time.Duration, callback func() any) (any, error) {
+// Remember Get an item from the cache, or execute the given Closure and store the result.
+func (r *Redis) Remember(key string, seconds time.Duration, callback func() (any, error)) (any, error) {
 	val := r.Get(key, nil)
 
 	if val != nil {
 		return val, nil
 	}
 
-	val = callback()
+	var err error
+	val, err = callback()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := r.Put(key, val, seconds); err != nil {
 		return nil, err
@@ -233,15 +237,19 @@ func (r *Redis) Remember(key string, seconds time.Duration, callback func() any)
 	return val, nil
 }
 
-//RememberForever Get an item from the cache, or execute the given Closure and store the result forever.
-func (r *Redis) RememberForever(key string, callback func() any) (any, error) {
+// RememberForever Get an item from the cache, or execute the given Closure and store the result forever.
+func (r *Redis) RememberForever(key string, callback func() (any, error)) (any, error) {
 	val := r.Get(key, nil)
 
 	if val != nil {
 		return val, nil
 	}
 
-	val = callback()
+	var err error
+	val, err = callback()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := r.Put(key, val, 0); err != nil {
 		return nil, err

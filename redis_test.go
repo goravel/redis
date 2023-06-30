@@ -348,14 +348,14 @@ func (s *RedisTestSuite) TestPut() {
 
 func (s *RedisTestSuite) TestRemember() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	value, err := s.redis.Remember("name", 1*time.Second, func() any {
-		return "World"
+	value, err := s.redis.Remember("name", 1*time.Second, func() (any, error) {
+		return "World", nil
 	})
 	s.Nil(err)
 	s.Equal("Goravel", value)
 
-	value, err = s.redis.Remember("name1", 1*time.Second, func() any {
-		return "World1"
+	value, err = s.redis.Remember("name1", 1*time.Second, func() (any, error) {
+		return "World1", nil
 	})
 	s.Nil(err)
 	s.Equal("World1", value)
@@ -366,14 +366,14 @@ func (s *RedisTestSuite) TestRemember() {
 
 func (s *RedisTestSuite) TestRememberForever() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	value, err := s.redis.RememberForever("name", func() any {
-		return "World"
+	value, err := s.redis.RememberForever("name", func() (any, error) {
+		return "World", nil
 	})
 	s.Nil(err)
 	s.Equal("Goravel", value)
 
-	value, err = s.redis.RememberForever("name1", func() any {
-		return "World1"
+	value, err = s.redis.RememberForever("name1", func() (any, error) {
+		return "World1", nil
 	})
 	s.Nil(err)
 	s.Equal("World1", value)
