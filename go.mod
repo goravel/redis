@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/goravel/framework v1.12.1-0.20230630034309-f35c4f8bc38c
+	github.com/goravel/framework v1.12.4
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cast v1.5.1
