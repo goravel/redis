@@ -23,6 +23,10 @@ type RedisTestSuite struct {
 }
 
 func TestRedisTestSuite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tests of using docker")
+	}
+
 	redisPool, redisDocker, redisStore, err := getRedisDocker()
 	if err != nil {
 		log.Fatalf("Get redis store error: %s", err)
