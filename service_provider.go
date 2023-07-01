@@ -22,7 +22,5 @@ func (receiver *ServiceProvider) Register(app foundation.Application) {
 }
 
 func (receiver *ServiceProvider) Boot(app foundation.Application) {
-	app.Publishes("github.com/goravel/cos", map[string]string{
-		"config/cos.go": app.ConfigPath(""),
-	})
+
 }
