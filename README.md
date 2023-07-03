@@ -24,7 +24,10 @@ import "github.com/goravel/redis"
 
 "providers": []foundation.ServiceProvider{
     ...
+    // Need register redis service provider before cache service provider
     &redis.ServiceProvider{},
+    &cache.ServiceProvider{},
+    ...
 }
 ```
 
