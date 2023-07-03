@@ -50,8 +50,8 @@ github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaUGG7oYTSPP8MxqL4YI3kZKwcP4=
 github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=
-github.com/goravel/framework v1.12.1-0.20230630034309-f35c4f8bc38c h1:YQSqR34sFie1Fnpla0D7i0UJgITGWJbxHVVtzT55NX0=
-github.com/goravel/framework v1.12.1-0.20230630034309-f35c4f8bc38c/go.mod h1:DJm4zqlh1BzRDdHefX31fRpDPmNaTl88huzjV7WYGVQ=
+github.com/goravel/framework v1.12.5 h1:TDTUiKX6OX+nS9ZacpKQgN4xDN0npr12PuXvW11R7VQ=
+github.com/goravel/framework v1.12.5/go.mod h1:TVXmtCGX4XSBx5DtzHxvdP+U0vB3a8UBkKobACdWycg=
 github.com/imdario/mergo v0.3.13 h1:lFzP57bqS/wsqKssCGmtLAb8A0wKjLGrve2q3PPVcBk=
 github.com/imdario/mergo v0.3.13/go.mod h1:4lJ1jqUDcsbIECGy0RUJAXNIhg+6ocWgb1ALK2O4oXg=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
