@@ -147,7 +147,7 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.mockConfig.On("GetString", "app.name").Return("goravel").Times(3)
 	s.mockConfig.On("GetString", "queue.connections.custom.queue", "default").Return("default").Once()
 	s.mockConfig.On("GetString", "queue.connections.custom.driver").Return("custom").Times(4)
-	s.mockConfig.On("GetString", "queue.connections.custom.via").Return(&s.redis).Times(3)
+	s.mockConfig.On("Get", "queue.connections.custom.via").Return(&s.redis).Times(3)
 	s.mockConfig.On("GetString", "queue.connections.custom.database").Return("default").Times(3)
 	s.mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Times(3)
 	s.mockConfig.On("GetString", "database.redis.default.password").Return("").Times(3)
