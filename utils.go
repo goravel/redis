@@ -4,7 +4,7 @@ import (
 	"context"
 
 	configmocks "github.com/goravel/framework/mocks/config"
-	queuemocks "github.com/goravel/framework/mocks/queue"
+	"github.com/goravel/framework/queue"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/pkg/errors"
@@ -37,30 +37,28 @@ func getCacheDocker() (*dockertest.Pool, *dockertest.Resource, *Cache, error) {
 	return pool, resource, store, nil
 }
 
-func getQueueDocker() (*dockertest.Pool, *dockertest.Resource, *Queue, error) {
-	mockConfig := &configmocks.Config{}
-	mockQueue := &queuemocks.Queue{}
+func getQueueDocker(config *configmocks.Config, app *queue.Application) (*dockertest.Pool, *dockertest.Resource, *Queue, error) {
 	pool, resource, err := initRedisDocker()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	var queue *Queue
+	var q *Queue
 	if err := pool.Retry(func() error {
 		var err error
-		mockConfig.On("GetString", "queue.connections.redis.connection", "default").Return("default").Once()
-		mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-		mockConfig.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
-		mockConfig.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
-		mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
-		queue, err = NewQueue(context.Background(), mockConfig, mockQueue, "redis")
+		config.On("GetString", "queue.connections.redis.connection", "default").Return("default").Once()
+		config.On("GetString", "database.redis.default.host").Return("localhost").Once()
+		config.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
+		config.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
+		config.On("GetInt", "database.redis.default.database").Return(0).Once()
+		q, err = NewQueue(context.Background(), config, app, "redis")
 
 		return err
 	}); err != nil {
 		return nil, nil, nil, err
 	}
 
-	return pool, resource, queue, nil
+	return pool, resource, q, nil
 }
 
 func pool() (*dockertest.Pool, error) {

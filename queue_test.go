@@ -35,12 +35,16 @@ func TestQueueTestSuite(t *testing.T) {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisPool, redisDocker, redisQueue, err := getQueueDocker()
+	mockConfig := &configmock.Config{}
+	app := queue.NewApplication(mockConfig)
+	redisPool, redisDocker, redisQueue, err := getQueueDocker(mockConfig, app)
 	if err != nil {
 		log.Fatalf("Get redis store error: %s", err)
 	}
 
 	suite.Run(t, &QueueTestSuite{
+		app:         app,
+		mockConfig:  mockConfig,
 		redisDocker: redisDocker,
 		redis:       redisQueue,
 	})
@@ -51,9 +55,6 @@ func TestQueueTestSuite(t *testing.T) {
 }
 
 func (s *QueueTestSuite) SetupTest() {
-	s.mockConfig = &configmock.Config{}
-	s.app = queue.NewApplication(s.mockConfig)
-
 	testRedisJob = 0
 	testDelayRedisJob = 0
 	testCustomRedisJob = 0
