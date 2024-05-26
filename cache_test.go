@@ -33,7 +33,7 @@ func TestCacheTestSuite(t *testing.T) {
 		redis:       redisStore,
 	})
 
-	if err := redisPool.Purge(redisDocker); err != nil {
+	if err = redisPool.Purge(redisDocker); err != nil {
 		log.Fatalf("Could not purge resource: %s", err)
 	}
 }

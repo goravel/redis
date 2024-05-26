@@ -11,6 +11,7 @@ import (
 	ormmock "github.com/goravel/framework/mocks/database/orm"
 	"github.com/goravel/framework/queue"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -41,6 +42,7 @@ func TestQueueTestSuite(t *testing.T) {
 	if err != nil {
 		log.Fatalf("Get redis store error: %s", err)
 	}
+	assert.Nil(t, app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}}))
 
 	suite.Run(t, &QueueTestSuite{
 		app:         app,
@@ -49,7 +51,7 @@ func TestQueueTestSuite(t *testing.T) {
 		redis:       redisQueue,
 	})
 
-	if err := redisPool.Purge(redisDocker); err != nil {
+	if err = redisPool.Purge(redisDocker); err != nil {
 		log.Fatalf("Could not purge resource: %s", err)
 	}
 }
@@ -68,8 +70,6 @@ func (s *QueueTestSuite) SetupTest() {
 	mockQuery.On("Table", "failed_jobs").Return(mockQuery)
 
 	queue.OrmFacade = mockOrm
-
-	s.Nil(s.app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}}))
 }
 
 func (s *QueueTestSuite) TestDefaultRedisQueue() {
