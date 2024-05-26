@@ -48,12 +48,11 @@ func getQueueDocker() (*dockertest.Pool, *dockertest.Resource, *Queue, error) {
 	var queue *Queue
 	if err := pool.Retry(func() error {
 		var err error
-		mockConfig.On("GetString", "cache.stores.redis.connection", "default").Return("default").Once()
+		mockConfig.On("GetString", "queue.connections.redis.connection", "default").Return("default").Once()
 		mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
 		mockConfig.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
 		mockConfig.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
 		mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
-		mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
 		queue, err = NewQueue(context.Background(), mockConfig, mockQueue, "redis")
 
 		return err
