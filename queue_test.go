@@ -9,7 +9,6 @@ import (
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	configmock "github.com/goravel/framework/mocks/config"
 	ormmock "github.com/goravel/framework/mocks/database/orm"
-	queuemock "github.com/goravel/framework/mocks/queue"
 	"github.com/goravel/framework/queue"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/suite"
@@ -27,7 +26,6 @@ type QueueTestSuite struct {
 	suite.Suite
 	app         *queue.Application
 	mockConfig  *configmock.Config
-	mockQueue   *queuemock.Queue
 	redis       *Queue
 	redisDocker *dockertest.Resource
 }
@@ -54,7 +52,6 @@ func TestQueueTestSuite(t *testing.T) {
 
 func (s *QueueTestSuite) SetupTest() {
 	s.mockConfig = &configmock.Config{}
-	s.mockQueue = &queuemock.Queue{}
 	s.app = queue.NewApplication(s.mockConfig)
 
 	testRedisJob = 0
@@ -87,7 +84,6 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	s.mockConfig.On("GetInt", "database.redis.default.database").Return(0).Times(2)
 	s.mockConfig.On("GetString", "queue.failed.database").Return("database").Once()
 	s.mockConfig.On("GetString", "queue.failed.table").Return("failed_jobs").Once()
-	s.mockQueue.On("GetJob", "test_redis_job").Return(TestRedisJob{}, nil).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -104,7 +100,6 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	s.Equal(1, testRedisJob)
 
 	s.mockConfig.AssertExpectations(s.T())
-	s.mockQueue.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestDelayRedisQueue() {
@@ -120,7 +115,6 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	s.mockConfig.On("GetInt", "database.redis.default.database").Return(0).Times(2)
 	s.mockConfig.On("GetString", "queue.failed.database").Return("database").Once()
 	s.mockConfig.On("GetString", "queue.failed.table").Return("failed_jobs").Once()
-	s.mockQueue.On("GetJob", "test_delay_redis_job").Return(TestDelayRedisJob{}, nil).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -141,7 +135,6 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	s.Equal(1, testDelayRedisJob)
 
 	s.mockConfig.AssertExpectations(s.T())
-	s.mockQueue.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestCustomRedisQueue() {
@@ -157,7 +150,6 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.mockConfig.On("GetInt", "database.redis.default.database").Return(0).Times(3)
 	s.mockConfig.On("GetString", "queue.failed.database").Return("database").Once()
 	s.mockConfig.On("GetString", "queue.failed.table").Return("failed_jobs").Once()
-	s.mockQueue.On("GetJob", "test_custom_redis_job").Return(TestCustomRedisJob{}, nil).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -178,7 +170,6 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.Equal(1, testCustomRedisJob)
 
 	s.mockConfig.AssertExpectations(s.T())
-	s.mockQueue.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestErrorRedisQueue() {
@@ -194,7 +185,6 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	s.mockConfig.On("GetInt", "database.redis.default.database").Return(0).Times(3)
 	s.mockConfig.On("GetString", "queue.failed.database").Return("database").Once()
 	s.mockConfig.On("GetString", "queue.failed.table").Return("failed_jobs").Once()
-	s.mockQueue.On("GetJob", "test_error_redis_job").Return(TestErrorRedisJob{}, nil).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -213,7 +203,6 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	s.Equal(0, testErrorRedisJob)
 
 	s.mockConfig.AssertExpectations(s.T())
-	s.mockQueue.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestChainRedisQueue() {
@@ -229,8 +218,6 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	s.mockConfig.On("GetInt", "database.redis.default.database").Return(0).Times(2)
 	s.mockConfig.On("GetString", "queue.failed.database").Return("database").Once()
 	s.mockConfig.On("GetString", "queue.failed.table").Return("failed_jobs").Once()
-	s.mockQueue.On("GetJob", "test_chain_redis_job").Return(TestChainRedisJob{}, nil).Once()
-	s.mockQueue.On("GetJob", "test_redis_job").Return(TestRedisJob{}, nil).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
