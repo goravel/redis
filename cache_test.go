@@ -1,38 +1,34 @@
 package redis
 
 import (
-	"context"
 	"log"
 	"testing"
 	"time"
 
 	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
-	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/suite"
 
 	configmocks "github.com/goravel/framework/mocks/config"
 )
 
-type RedisTestSuite struct {
+type CacheTestSuite struct {
 	suite.Suite
 	mockConfig  *configmocks.Config
-	redis       *Redis
+	redis       *Cache
 	redisDocker *dockertest.Resource
 }
 
-func TestRedisTestSuite(t *testing.T) {
+func TestCacheTestSuite(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisPool, redisDocker, redisStore, err := getRedisDocker()
+	redisPool, redisDocker, redisStore, err := getCacheDocker()
 	if err != nil {
 		log.Fatalf("Get redis store error: %s", err)
 	}
 
-	suite.Run(t, &RedisTestSuite{
+	suite.Run(t, &CacheTestSuite{
 		redisDocker: redisDocker,
 		redis:       redisStore,
 	})
@@ -42,11 +38,11 @@ func TestRedisTestSuite(t *testing.T) {
 	}
 }
 
-func (s *RedisTestSuite) SetupTest() {
+func (s *CacheTestSuite) SetupTest() {
 	s.mockConfig = &configmocks.Config{}
 }
 
-func (s *RedisTestSuite) TestAdd() {
+func (s *CacheTestSuite) TestAdd() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	s.False(s.redis.Add("name", "World", 1*time.Second))
 	s.True(s.redis.Add("name1", "World", 1*time.Second))
@@ -56,7 +52,7 @@ func (s *RedisTestSuite) TestAdd() {
 	s.True(s.redis.Flush())
 }
 
-func (s *RedisTestSuite) TestDecrement() {
+func (s *CacheTestSuite) TestDecrement() {
 	res, err := s.redis.Decrement("decrement")
 	s.Equal(-1, res)
 	s.Nil(err)
@@ -83,13 +79,13 @@ func (s *RedisTestSuite) TestDecrement() {
 	s.Nil(err)
 }
 
-func (s *RedisTestSuite) TestForever() {
+func (s *CacheTestSuite) TestForever() {
 	s.True(s.redis.Forever("name", "Goravel"))
 	s.Equal("Goravel", s.redis.Get("name", "").(string))
 	s.True(s.redis.Flush())
 }
 
-func (s *RedisTestSuite) TestForget() {
+func (s *CacheTestSuite) TestForget() {
 	val := s.redis.Forget("test-forget")
 	s.True(val)
 
@@ -98,7 +94,7 @@ func (s *RedisTestSuite) TestForget() {
 	s.True(s.redis.Forget("test-forget"))
 }
 
-func (s *RedisTestSuite) TestFlush() {
+func (s *CacheTestSuite) TestFlush() {
 	s.Nil(s.redis.Put("test-flush", "goravel", 5*time.Second))
 	s.Equal("goravel", s.redis.Get("test-flush", nil).(string))
 
@@ -106,7 +102,7 @@ func (s *RedisTestSuite) TestFlush() {
 	s.False(s.redis.Has("test-flush"))
 }
 
-func (s *RedisTestSuite) TestGet() {
+func (s *CacheTestSuite) TestGet() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	s.Equal("Goravel", s.redis.Get("name", "").(string))
 	s.Equal("World", s.redis.Get("name1", "World").(string))
@@ -117,31 +113,31 @@ func (s *RedisTestSuite) TestGet() {
 	s.True(s.redis.Flush())
 }
 
-func (s *RedisTestSuite) TestGetBool() {
+func (s *CacheTestSuite) TestGetBool() {
 	s.Equal(true, s.redis.GetBool("test-get-bool", true))
 	s.Nil(s.redis.Put("test-get-bool", true, 2*time.Second))
 	s.Equal(true, s.redis.GetBool("test-get-bool", false))
 }
 
-func (s *RedisTestSuite) TestGetInt() {
+func (s *CacheTestSuite) TestGetInt() {
 	s.Equal(2, s.redis.GetInt("test-get-int", 2))
 	s.Nil(s.redis.Put("test-get-int", 3, 2*time.Second))
 	s.Equal(3, s.redis.GetInt("test-get-int", 2))
 }
 
-func (s *RedisTestSuite) TestGetString() {
+func (s *CacheTestSuite) TestGetString() {
 	s.Equal("2", s.redis.GetString("test-get-string", "2"))
 	s.Nil(s.redis.Put("test-get-string", "3", 2*time.Second))
 	s.Equal("3", s.redis.GetString("test-get-string", "2"))
 }
 
-func (s *RedisTestSuite) TestHas() {
+func (s *CacheTestSuite) TestHas() {
 	s.False(s.redis.Has("test-has"))
 	s.Nil(s.redis.Put("test-has", "goravel", 5*time.Second))
 	s.True(s.redis.Has("test-has"))
 }
 
-func (s *RedisTestSuite) TestIncrement() {
+func (s *CacheTestSuite) TestIncrement() {
 	res, err := s.redis.Increment("Increment")
 	s.Equal(1, res)
 	s.Nil(err)
@@ -168,7 +164,7 @@ func (s *RedisTestSuite) TestIncrement() {
 	s.Nil(err)
 }
 
-func (s *RedisTestSuite) TestLock() {
+func (s *CacheTestSuite) TestLock() {
 	tests := []struct {
 		name  string
 		setup func()
@@ -335,14 +331,14 @@ func (s *RedisTestSuite) TestLock() {
 	}
 }
 
-func (s *RedisTestSuite) TestPull() {
+func (s *CacheTestSuite) TestPull() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	s.True(s.redis.Has("name"))
 	s.Equal("Goravel", s.redis.Pull("name", "").(string))
 	s.False(s.redis.Has("name"))
 }
 
-func (s *RedisTestSuite) TestPut() {
+func (s *CacheTestSuite) TestPut() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	s.True(s.redis.Has("name"))
 	s.Equal("Goravel", s.redis.Get("name", "").(string))
@@ -350,7 +346,7 @@ func (s *RedisTestSuite) TestPut() {
 	s.False(s.redis.Has("name"))
 }
 
-func (s *RedisTestSuite) TestRemember() {
+func (s *CacheTestSuite) TestRemember() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	value, err := s.redis.Remember("name", 1*time.Second, func() (any, error) {
 		return "World", nil
@@ -368,7 +364,7 @@ func (s *RedisTestSuite) TestRemember() {
 	s.True(s.redis.Flush())
 }
 
-func (s *RedisTestSuite) TestRememberForever() {
+func (s *CacheTestSuite) TestRememberForever() {
 	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
 	value, err := s.redis.RememberForever("name", func() (any, error) {
 		return "World", nil
@@ -382,87 +378,4 @@ func (s *RedisTestSuite) TestRememberForever() {
 	s.Nil(err)
 	s.Equal("World1", value)
 	s.True(s.redis.Flush())
-}
-
-func getRedisDocker() (*dockertest.Pool, *dockertest.Resource, *Redis, error) {
-	mockConfig := &configmocks.Config{}
-	pool, resource, err := initRedisDocker()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	var store *Redis
-	if err := pool.Retry(func() error {
-		var err error
-		mockConfig.On("GetString", "cache.stores.redis.connection", "default").Return("default").Once()
-		mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-		mockConfig.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
-		mockConfig.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
-		mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
-		mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
-		store, err = NewRedis(context.Background(), mockConfig, "redis")
-
-		return err
-	}); err != nil {
-		return nil, nil, nil, err
-	}
-
-	return pool, resource, store, nil
-}
-
-func pool() (*dockertest.Pool, error) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		return nil, errors.WithMessage(err, "Could not construct pool")
-	}
-
-	if err := pool.Client.Ping(); err != nil {
-		return nil, errors.WithMessage(err, "Could not connect to Docker")
-	}
-
-	return pool, nil
-}
-
-func resource(pool *dockertest.Pool, opts *dockertest.RunOptions) (*dockertest.Resource, error) {
-	return pool.RunWithOptions(opts, func(config *docker.HostConfig) {
-		// set AutoRemove to true so that stopped container goes away by itself
-		config.AutoRemove = true
-		config.RestartPolicy = docker.RestartPolicy{
-			Name: "no",
-		}
-	})
-}
-
-func initRedisDocker() (*dockertest.Pool, *dockertest.Resource, error) {
-	pool, err := pool()
-	if err != nil {
-		return nil, nil, err
-	}
-	resource, err := resource(pool, &dockertest.RunOptions{
-		Repository: "redis",
-		Tag:        "latest",
-		Env:        []string{},
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	_ = resource.Expire(600)
-
-	if err := pool.Retry(func() error {
-		client := redis.NewClient(&redis.Options{
-			Addr:     "localhost:" + resource.GetPort("6379/tcp"),
-			Password: "",
-			DB:       0,
-		})
-
-		if _, err := client.Ping(context.Background()).Result(); err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return nil, nil, err
-	}
-
-	return pool, resource, nil
 }
