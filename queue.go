@@ -10,7 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/goravel/framework/contracts/config"
-	"github.com/goravel/framework/contracts/queue"
+	contractsqueue "github.com/goravel/framework/contracts/queue"
+	"github.com/goravel/framework/queue"
 	"github.com/goravel/framework/support/json"
 )
 
@@ -20,16 +21,16 @@ type queueData struct {
 	Attempts  uint   `json:"attempts"`
 }
 
-var _ queue.Driver = &Queue{}
+var _ contractsqueue.Driver = &Queue{}
 
 type Queue struct {
 	ctx        context.Context
-	queue      queue.Queue
+	queue      contractsqueue.Queue
 	instance   *redis.Client
 	connection string
 }
 
-func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, connection string) (*Queue, error) {
+func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, connection string) (*Queue, error) {
 	redisConnection := config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
 	host := config.GetString(fmt.Sprintf("database.redis.%s.host", redisConnection))
 	if host == "" {
@@ -59,10 +60,10 @@ func (r *Queue) Connection() string {
 }
 
 func (r *Queue) Driver() string {
-	return "custom"
+	return queue.DriverCustom
 }
 
-func (r *Queue) Push(job queue.Job, args []any, queue string) error {
+func (r *Queue) Push(job contractsqueue.Job, args []any, queue string) error {
 	payload, err := r.jobToJSON(job.Signature(), args)
 	if err != nil {
 		return err
@@ -71,7 +72,7 @@ func (r *Queue) Push(job queue.Job, args []any, queue string) error {
 	return r.instance.RPush(r.ctx, queue, payload).Err()
 }
 
-func (r *Queue) Bulk(jobs []queue.Jobs, queue string) error {
+func (r *Queue) Bulk(jobs []contractsqueue.Jobs, queue string) error {
 	pipe := r.instance.Pipeline()
 
 	for _, job := range jobs {
@@ -95,7 +96,7 @@ func (r *Queue) Bulk(jobs []queue.Jobs, queue string) error {
 	return err
 }
 
-func (r *Queue) Later(delay uint, job queue.Job, args []any, queue string) error {
+func (r *Queue) Later(delay uint, job contractsqueue.Job, args []any, queue string) error {
 	payload, err := r.jobToJSON(job.Signature(), args)
 	if err != nil {
 		return err
@@ -108,7 +109,7 @@ func (r *Queue) Later(delay uint, job queue.Job, args []any, queue string) error
 	}).Err()
 }
 
-func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
+func (r *Queue) Pop(queue string) (contractsqueue.Job, []any, error) {
 	if err := r.migrateDelayedJobs(queue); err != nil {
 		return nil, nil, err
 	}
