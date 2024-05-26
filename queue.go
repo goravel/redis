@@ -24,7 +24,6 @@ var _ queue.Driver = &Queue{}
 
 type Queue struct {
 	ctx        context.Context
-	config     config.Config
 	queue      queue.Queue
 	instance   *redis.Client
 	connection string
@@ -49,6 +48,7 @@ func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, conn
 
 	return &Queue{
 		ctx:        ctx,
+		queue:      queue,
 		instance:   client,
 		connection: connection,
 	}, nil
