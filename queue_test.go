@@ -89,11 +89,11 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		s.Nil(s.app.Worker(nil).Run())
+		worker := s.app.Worker(nil)
+		s.Nil(worker.Run())
 
-		for range ctx.Done() {
-			return
-		}
+		<-ctx.Done()
+		s.Nil(worker.Shutdown())
 	}(ctx)
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestRedisJob{}, []any{"TestDefaultRedisQueue", 1}).Dispatch())
@@ -120,13 +120,13 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		s.Nil(s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(&contractsqueue.Args{
 			Queue: "delay",
-		}).Run())
+		})
+		s.Nil(worker.Run())
 
-		for range ctx.Done() {
-			return
-		}
+		<-ctx.Done()
+		s.Nil(worker.Shutdown())
 	}(ctx)
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestDelayRedisJob{}, []any{"TestDelayRedisQueue", 1}).OnQueue("delay").Delay(3).Dispatch())
@@ -155,15 +155,15 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		s.Nil(s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(&contractsqueue.Args{
 			Connection: "custom",
 			Queue:      "custom1",
 			Concurrent: 2,
-		}).Run())
+		})
+		s.Nil(worker.Run())
 
-		for range ctx.Done() {
-			return
-		}
+		<-ctx.Done()
+		s.Nil(worker.Shutdown())
 	}(ctx)
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestCustomRedisJob{}, []any{"TestCustomRedisQueue", 1}).OnConnection("custom").OnQueue("custom1").Dispatch())
@@ -190,13 +190,13 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		s.Nil(s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(&contractsqueue.Args{
 			Queue: "error",
-		}).Run())
+		})
+		s.Nil(worker.Run())
 
-		for range ctx.Done() {
-			return
-		}
+		<-ctx.Done()
+		s.Nil(worker.Shutdown())
 	}(ctx)
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestErrorRedisJob{}, []any{"TestErrorRedisQueue", 1}).OnConnection("redis").OnQueue("error1").Dispatch())
@@ -223,13 +223,13 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		s.Nil(s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(&contractsqueue.Args{
 			Queue: "chain",
-		}).Run())
+		})
+		s.Nil(worker.Run())
 
-		for range ctx.Done() {
-			return
-		}
+		<-ctx.Done()
+		s.Nil(worker.Shutdown())
 	}(ctx)
 
 	time.Sleep(2 * time.Second)
