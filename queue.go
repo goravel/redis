@@ -119,7 +119,7 @@ func (r *Queue) Pop(queue string) (contractsqueue.Job, []any, error) {
 		return nil, nil, err
 	}
 
-	signature, args, err := r.jsonToJob(result[1])
+	signature, args, err := r.jsonToJob(result)
 	if err != nil {
 		return nil, nil, err
 	}
