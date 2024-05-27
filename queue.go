@@ -114,10 +114,8 @@ func (r *Queue) Pop(queue string) (contractsqueue.Job, []any, error) {
 		return nil, nil, err
 	}
 
-	result, err := r.instance.BLPop(r.ctx, 60*time.Second, queue).Result()
-	if errors.Is(err, redis.Nil) {
-		return r.Pop(queue)
-	} else if err != nil {
+	result, err := r.instance.LPop(r.ctx, queue).Result()
+	if err != nil {
 		return nil, nil, err
 	}
 
