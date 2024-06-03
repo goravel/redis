@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"strconv"
 	"time"
@@ -31,11 +32,27 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 		return nil, nil
 	}
 
-	client := redis.NewClient(&redis.Options{
+	option := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
 		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
-	})
+	}
+
+	_, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(map[string]any)
+	if ok {
+		option.TLSConfig = &tls.Config{
+			InsecureSkipVerify: config.GetBool(fmt.Sprintf("database.redis.%s.tls.insecure_skip_verify", connection)),
+			ServerName:         config.GetString(fmt.Sprintf("database.redis.%s.tls.server_name", connection)),
+			MinVersion:         tls.VersionTLS12,
+		}
+
+		certificates, ok := config.Get(fmt.Sprintf("database.redis.%s.tls.certificates", connection)).([]tls.Certificate)
+		if ok {
+			option.TLSConfig.Certificates = certificates
+		}
+	}
+
+	client := redis.NewClient(option)
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
 		return nil, errors.WithMessage(err, "init connection error")
