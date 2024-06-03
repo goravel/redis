@@ -38,18 +38,9 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	}
 
-	_, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(map[string]any)
+	tlsConfig, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(tls.Config)
 	if ok {
-		option.TLSConfig = &tls.Config{
-			InsecureSkipVerify: config.GetBool(fmt.Sprintf("database.redis.%s.tls.insecure_skip_verify", connection)),
-			ServerName:         config.GetString(fmt.Sprintf("database.redis.%s.tls.server_name", connection)),
-			MinVersion:         tls.VersionTLS12,
-		}
-
-		certificates, ok := config.Get(fmt.Sprintf("database.redis.%s.tls.certificates", connection)).([]tls.Certificate)
-		if ok {
-			option.TLSConfig.Certificates = certificates
-		}
+		option.TLSConfig = &tlsConfig
 	}
 
 	client := redis.NewClient(option)

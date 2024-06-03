@@ -56,6 +56,20 @@ import (
 4. Fill redis configuration to `config/database.go` file
 
 ```
+// config/database.go
+"redis": map[string]any{
+    "default": map[string]any{
+        "host":     config.Env("REDIS_HOST", ""),
+        "password": config.Env("REDIS_PASSWORD", ""),
+        "port":     config.Env("REDIS_PORT", 6379),
+        "database": config.Env("REDIS_DB", 0),
+    },
+},
+```
+
+To enable TLS/SSL, you need to add the following configuration:
+
+```
 import "crypto/tls"
 
 // config/database.go
@@ -65,11 +79,8 @@ import "crypto/tls"
         "password": config.Env("REDIS_PASSWORD", ""),
         "port":     config.Env("REDIS_PORT", 6379),
         "database": config.Env("REDIS_DB", 0),
-        // if you want to use tls, you can set tls config
-        "tls": map[string]any{
-            "insecure_skip_verify": config.Env("REDIS_TLS_INSECURE_SKIP_VERIFY", false),
-            "server_name":          config.Env("REDIS_TLS_SERVER_NAME", ""),
-            "certificates":         []tls.Certificate{},
+        "tls": tls.Config{
+          // Add your tls configuration here
         },
     },
 },

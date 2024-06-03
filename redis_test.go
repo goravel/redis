@@ -399,6 +399,7 @@ func getRedisDocker() (*dockertest.Pool, *dockertest.Resource, *Redis, error) {
 		mockConfig.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
 		mockConfig.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
 		mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
+		mockConfig.On("Get", "database.redis.default.tls").Return(nil).Once()
 		mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
 		store, err = NewRedis(context.Background(), mockConfig, "redis")
 
