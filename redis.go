@@ -38,9 +38,9 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	}
 
-	tlsConfig, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(tls.Config)
+	tlsConfig, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(*tls.Config)
 	if ok {
-		option.TLSConfig = tlsConfig.Clone()
+		option.TLSConfig = tlsConfig
 	}
 
 	client := redis.NewClient(option)

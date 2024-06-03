@@ -79,7 +79,7 @@ import "crypto/tls"
         "password": config.Env("REDIS_PASSWORD", ""),
         "port":     config.Env("REDIS_PORT", 6379),
         "database": config.Env("REDIS_DB", 0),
-        "tls": tls.Config{
+        "tls": &tls.Config{
           // Add your tls configuration here
         },
     },
