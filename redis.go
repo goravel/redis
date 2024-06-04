@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"strconv"
 	"time"
@@ -31,11 +32,18 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 		return nil, nil
 	}
 
-	client := redis.NewClient(&redis.Options{
+	option := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
 		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
-	})
+	}
+
+	tlsConfig, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(*tls.Config)
+	if ok {
+		option.TLSConfig = tlsConfig
+	}
+
+	client := redis.NewClient(option)
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
 		return nil, errors.WithMessage(err, "init connection error")
