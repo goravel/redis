@@ -12,12 +12,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/suite"
 
-	configmocks "github.com/goravel/framework/contracts/config/mocks"
+	configmock "github.com/goravel/framework/mocks/config"
 )
 
 type RedisTestSuite struct {
 	suite.Suite
-	mockConfig  *configmocks.Config
+	mockConfig  *configmock.Config
 	redis       *Redis
 	redisDocker *dockertest.Resource
 }
@@ -43,7 +43,7 @@ func TestRedisTestSuite(t *testing.T) {
 }
 
 func (s *RedisTestSuite) SetupTest() {
-	s.mockConfig = &configmocks.Config{}
+	s.mockConfig = &configmock.Config{}
 }
 
 func (s *RedisTestSuite) TestAdd() {
@@ -385,7 +385,7 @@ func (s *RedisTestSuite) TestRememberForever() {
 }
 
 func getRedisDocker() (*dockertest.Pool, *dockertest.Resource, *Redis, error) {
-	mockConfig := &configmocks.Config{}
+	mockConfig := &configmock.Config{}
 	pool, resource, err := initRedisDocker()
 	if err != nil {
 		return nil, nil, nil, err
