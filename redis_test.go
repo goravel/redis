@@ -2,44 +2,49 @@ package redis
 
 import (
 	"context"
-	"log"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/suite"
-
 	configmock "github.com/goravel/framework/mocks/config"
+	testingdocker "github.com/goravel/framework/support/docker"
+	"github.com/goravel/framework/support/env"
+	"github.com/spf13/cast"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 type RedisTestSuite struct {
 	suite.Suite
-	mockConfig  *configmock.Config
-	redis       *Redis
-	redisDocker *dockertest.Resource
+	mockConfig *configmock.Config
+	redis      *Redis
 }
 
 func TestRedisTestSuite(t *testing.T) {
-	if testing.Short() {
+	if env.IsWindows() {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisPool, redisDocker, redisStore, err := getRedisDocker()
-	if err != nil {
-		log.Fatalf("Get redis store error: %s", err)
-	}
+	redisDocker := testingdocker.NewRedis()
+	assert.Nil(t, redisDocker.Build())
+
+	mockConfig := &configmock.Config{}
+	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return("default").Once()
+	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
+	mockConfig.EXPECT().Get("database.redis.default.tls").Return(nil).Once()
+	mockConfig.EXPECT().GetString("cache.prefix").Return("goravel_cache").Once()
+	store, err := NewRedis(context.Background(), mockConfig, "redis")
+	require.NoError(t, err)
+	mockConfig.AssertExpectations(t)
 
 	suite.Run(t, &RedisTestSuite{
-		redisDocker: redisDocker,
-		redis:       redisStore,
+		redis: store,
 	})
 
-	if err := redisPool.Purge(redisDocker); err != nil {
-		log.Fatalf("Could not purge resource: %s", err)
-	}
+	assert.Nil(t, redisDocker.Stop())
 }
 
 func (s *RedisTestSuite) SetupTest() {
@@ -382,88 +387,4 @@ func (s *RedisTestSuite) TestRememberForever() {
 	s.Nil(err)
 	s.Equal("World1", value)
 	s.True(s.redis.Flush())
-}
-
-func getRedisDocker() (*dockertest.Pool, *dockertest.Resource, *Redis, error) {
-	mockConfig := &configmock.Config{}
-	pool, resource, err := initRedisDocker()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	var store *Redis
-	if err := pool.Retry(func() error {
-		var err error
-		mockConfig.On("GetString", "cache.stores.redis.connection", "default").Return("default").Once()
-		mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-		mockConfig.On("GetString", "database.redis.default.port").Return(resource.GetPort("6379/tcp")).Once()
-		mockConfig.On("GetString", "database.redis.default.password").Return(resource.GetPort("")).Once()
-		mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
-		mockConfig.On("Get", "database.redis.default.tls").Return(nil).Once()
-		mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
-		store, err = NewRedis(context.Background(), mockConfig, "redis")
-
-		return err
-	}); err != nil {
-		return nil, nil, nil, err
-	}
-
-	return pool, resource, store, nil
-}
-
-func pool() (*dockertest.Pool, error) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		return nil, errors.WithMessage(err, "Could not construct pool")
-	}
-
-	if err := pool.Client.Ping(); err != nil {
-		return nil, errors.WithMessage(err, "Could not connect to Docker")
-	}
-
-	return pool, nil
-}
-
-func resource(pool *dockertest.Pool, opts *dockertest.RunOptions) (*dockertest.Resource, error) {
-	return pool.RunWithOptions(opts, func(config *docker.HostConfig) {
-		// set AutoRemove to true so that stopped container goes away by itself
-		config.AutoRemove = true
-		config.RestartPolicy = docker.RestartPolicy{
-			Name: "no",
-		}
-	})
-}
-
-func initRedisDocker() (*dockertest.Pool, *dockertest.Resource, error) {
-	pool, err := pool()
-	if err != nil {
-		return nil, nil, err
-	}
-	resource, err := resource(pool, &dockertest.RunOptions{
-		Repository: "redis",
-		Tag:        "latest",
-		Env:        []string{},
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	_ = resource.Expire(600)
-
-	if err := pool.Retry(func() error {
-		client := redis.NewClient(&redis.Options{
-			Addr:     "localhost:" + resource.GetPort("6379/tcp"),
-			Password: "",
-			DB:       0,
-		})
-
-		if _, err := client.Ping(context.Background()).Result(); err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return nil, nil, err
-	}
-
-	return pool, resource, nil
 }
