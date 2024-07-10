@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 
 	"github.com/goravel/framework/contracts/cache"
@@ -46,7 +45,7 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 	client := redis.NewClient(option)
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, errors.WithMessage(err, "init connection error")
+		return nil, fmt.Errorf("init connection error: %w", err)
 	}
 
 	return &Redis{
