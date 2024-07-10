@@ -91,7 +91,7 @@ func (s *RedisTestSuite) TestDecrement() {
 }
 
 func (s *RedisTestSuite) TestDecrementWithConcurrent() {
-	res, err := s.redis.Decrement("decrement")
+	res, err := s.redis.Decrement("decrement_concurrent")
 	s.Equal(int64(-1), res)
 	s.Nil(err)
 
@@ -99,7 +99,7 @@ func (s *RedisTestSuite) TestDecrementWithConcurrent() {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			_, err = s.redis.Decrement("decrement", 1)
+			_, err = s.redis.Decrement("decrement_concurrent", 1)
 			s.Nil(err)
 			wg.Done()
 		}()
@@ -107,7 +107,7 @@ func (s *RedisTestSuite) TestDecrementWithConcurrent() {
 
 	wg.Wait()
 
-	res = s.redis.GetInt64("decrement")
+	res = s.redis.GetInt64("decrement_concurrent")
 	s.Equal(int64(-1001), res)
 	s.Nil(err)
 }
@@ -199,7 +199,7 @@ func (s *RedisTestSuite) TestIncrement() {
 }
 
 func (s *RedisTestSuite) TestIncrementWithConcurrent() {
-	res, err := s.redis.Increment("increment")
+	res, err := s.redis.Increment("decrement_concurrent")
 	s.Equal(int64(1), res)
 	s.Nil(err)
 
@@ -207,7 +207,7 @@ func (s *RedisTestSuite) TestIncrementWithConcurrent() {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			_, err = s.redis.Increment("increment", 1)
+			_, err = s.redis.Increment("decrement_concurrent", 1)
 			s.Nil(err)
 			wg.Done()
 		}()
@@ -215,7 +215,7 @@ func (s *RedisTestSuite) TestIncrementWithConcurrent() {
 
 	wg.Wait()
 
-	res = s.redis.GetInt64("increment")
+	res = s.redis.GetInt64("decrement_concurrent")
 	s.Equal(int64(1001), res)
 	s.Nil(err)
 }
