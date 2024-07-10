@@ -2,12 +2,9 @@ module github.com/goravel/redis
 
 go 1.22
 
-toolchain go1.22.4
-
 require (
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/goravel/framework v1.14.1-0.20240710154938-a5224197c224
-	github.com/pkg/errors v0.9.1
+	github.com/redis/go-redis/v9 v9.5.3
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.9.0
 )
@@ -34,7 +31,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/microsoft/go-mssqldb v1.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/redis/go-redis/v9 v9.5.3 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
