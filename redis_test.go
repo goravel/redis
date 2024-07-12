@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,28 +64,51 @@ func (s *RedisTestSuite) TestAdd() {
 
 func (s *RedisTestSuite) TestDecrement() {
 	res, err := s.redis.Decrement("decrement")
-	s.Equal(-1, res)
+	s.Equal(int64(-1), res)
 	s.Nil(err)
 
-	s.Equal(-1, s.redis.GetInt("decrement"))
+	s.Equal(int64(-1), s.redis.GetInt64("decrement"))
 
 	res, err = s.redis.Decrement("decrement", 2)
-	s.Equal(-3, res)
+	s.Equal(int64(-3), res)
 	s.Nil(err)
 
 	res, err = s.redis.Decrement("decrement1", 2)
-	s.Equal(-2, res)
+	s.Equal(int64(-2), res)
 	s.Nil(err)
 
-	s.Equal(-2, s.redis.GetInt("decrement1"))
+	s.Equal(int64(-2), s.redis.GetInt64("decrement1"))
 
-	s.True(s.redis.Add("decrement2", 4, 2*time.Second))
+	decrement2 := int64(4)
+	s.True(s.redis.Add("decrement2", &decrement2, 2*time.Second))
 	res, err = s.redis.Decrement("decrement2")
-	s.Equal(3, res)
+	s.Equal(int64(3), res)
 	s.Nil(err)
 
 	res, err = s.redis.Decrement("decrement2", 2)
-	s.Equal(1, res)
+	s.Equal(int64(1), res)
+	s.Nil(err)
+}
+
+func (s *RedisTestSuite) TestDecrementWithConcurrent() {
+	res, err := s.redis.Decrement("decrement_concurrent")
+	s.Equal(int64(-1), res)
+	s.Nil(err)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func() {
+			_, err = s.redis.Decrement("decrement_concurrent", 1)
+			s.Nil(err)
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	res = s.redis.GetInt64("decrement_concurrent")
+	s.Equal(int64(-1001), res)
 	s.Nil(err)
 }
 
@@ -148,28 +172,51 @@ func (s *RedisTestSuite) TestHas() {
 
 func (s *RedisTestSuite) TestIncrement() {
 	res, err := s.redis.Increment("Increment")
-	s.Equal(1, res)
+	s.Equal(int64(1), res)
 	s.Nil(err)
 
-	s.Equal(1, s.redis.GetInt("Increment"))
+	s.Equal(int64(1), s.redis.GetInt64("Increment"))
 
 	res, err = s.redis.Increment("Increment", 2)
-	s.Equal(3, res)
+	s.Equal(int64(3), res)
 	s.Nil(err)
 
 	res, err = s.redis.Increment("Increment1", 2)
-	s.Equal(2, res)
+	s.Equal(int64(2), res)
 	s.Nil(err)
 
-	s.Equal(2, s.redis.GetInt("Increment1"))
+	s.Equal(int64(2), s.redis.GetInt64("Increment1"))
 
-	s.True(s.redis.Add("Increment2", 1, 2*time.Second))
+	increment2 := int64(1)
+	s.True(s.redis.Add("Increment2", &increment2, 2*time.Second))
 	res, err = s.redis.Increment("Increment2")
-	s.Equal(2, res)
+	s.Equal(int64(2), res)
 	s.Nil(err)
 
 	res, err = s.redis.Increment("Increment2", 2)
-	s.Equal(4, res)
+	s.Equal(int64(4), res)
+	s.Nil(err)
+}
+
+func (s *RedisTestSuite) TestIncrementWithConcurrent() {
+	res, err := s.redis.Increment("decrement_concurrent")
+	s.Equal(int64(1), res)
+	s.Nil(err)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func() {
+			_, err = s.redis.Increment("decrement_concurrent", 1)
+			s.Nil(err)
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	res = s.redis.GetInt64("decrement_concurrent")
+	s.Equal(int64(1001), res)
 	s.Nil(err)
 }
 
