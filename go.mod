@@ -1,9 +1,9 @@
 module github.com/goravel/redis
 
-go 1.22
+go 1.21
 
 require (
-	github.com/goravel/framework v1.14.1-0.20240710154938-a5224197c224
+	github.com/goravel/framework v1.14.1-0.20240712082750-8fee27562ae0
 	github.com/redis/go-redis/v9 v9.5.3
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.9.0
@@ -46,7 +46,7 @@ require (
 	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlserver v1.5.3 // indirect
-	gorm.io/gorm v1.25.10 // indirect
+	gorm.io/gorm v1.25.11 // indirect
 	modernc.org/libc v1.37.6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
