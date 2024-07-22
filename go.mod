@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/goravel/framework v1.14.3
+	github.com/goravel/framework v1.14.4
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cast v1.6.0
 	github.com/stretchr/testify v1.9.0
