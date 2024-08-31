@@ -54,6 +54,7 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 		prefix:   fmt.Sprintf("%s:", config.GetString("cache.prefix")),
 		instance: client,
 		store:    store,
+		config:   config,
 	}, nil
 }
 
