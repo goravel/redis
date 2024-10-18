@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 
 	"github.com/goravel/framework/contracts/cache"
@@ -46,7 +45,7 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 	client := redis.NewClient(option)
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, errors.WithMessage(err, "init connection error")
+		return nil, fmt.Errorf("init connection error: %w", err)
 	}
 
 	return &Redis{
@@ -68,14 +67,12 @@ func (r *Redis) Add(key string, value any, t time.Duration) bool {
 	return val
 }
 
-func (r *Redis) Decrement(key string, value ...int) (int, error) {
+func (r *Redis) Decrement(key string, value ...int64) (int64, error) {
 	if len(value) == 0 {
 		value = append(value, 1)
 	}
 
-	res, err := r.instance.DecrBy(r.ctx, r.key(key), int64(value[0])).Result()
-
-	return int(res), err
+	return r.instance.DecrBy(r.ctx, r.key(key), value[0]).Result()
 }
 
 // Forever Driver an item in the cache indefinitely.
@@ -188,14 +185,12 @@ func (r *Redis) Has(key string) bool {
 	return true
 }
 
-func (r *Redis) Increment(key string, value ...int) (int, error) {
+func (r *Redis) Increment(key string, value ...int64) (int64, error) {
 	if len(value) == 0 {
 		value = append(value, 1)
 	}
 
-	res, err := r.instance.IncrBy(r.ctx, r.key(key), int64(value[0])).Result()
-
-	return int(res), err
+	return r.instance.IncrBy(r.ctx, r.key(key), value[0]).Result()
 }
 
 func (r *Redis) Lock(key string, t ...time.Duration) cache.Lock {

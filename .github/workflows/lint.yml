@@ -8,14 +8,5 @@ permissions:
   contents: read
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
-      - name: Lint 🎨
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=30m ./...
+    uses: goravel/.github/.github/workflows/lint.yml@master
+    secrets: inherit
