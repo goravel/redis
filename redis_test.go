@@ -45,7 +45,7 @@ func TestRedisTestSuite(t *testing.T) {
 		redis: store,
 	})
 
-	assert.Nil(t, redisDocker.Stop())
+	assert.Nil(t, redisDocker.Shutdown())
 }
 
 func (s *RedisTestSuite) SetupTest() {
