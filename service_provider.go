@@ -6,9 +6,10 @@ import (
 	"github.com/goravel/framework/contracts/foundation"
 )
 
-const CacheBinding = "goravel.redis.cache"
-
-const QueueBinding = "goravel.redis.queue"
+const (
+	CacheBinding = "goravel.redis.cache"
+	QueueBinding = "goravel.redis.queue"
+)
 
 var App foundation.Application
 
