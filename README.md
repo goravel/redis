@@ -6,6 +6,7 @@ A redis disk driver for `facades.Cache()` of Goravel.
 
 | goravel/redis  | goravel/framework    |
 | ----------     | --------------       |
+| v1.2.*         | v1.14.*              |
 | v1.1.*         | v1.13.*              |
 | v1.0.*         | v1.12.*              |
 
@@ -63,6 +64,25 @@ import (
         "password": config.Env("REDIS_PASSWORD", ""),
         "port":     config.Env("REDIS_PORT", 6379),
         "database": config.Env("REDIS_DB", 0),
+    },
+},
+```
+
+To enable TLS/SSL, you need to add the following configuration:
+
+```
+import "crypto/tls"
+
+// config/database.go
+"redis": map[string]any{
+    "default": map[string]any{
+        "host":     config.Env("REDIS_HOST", ""),
+        "password": config.Env("REDIS_PASSWORD", ""),
+        "port":     config.Env("REDIS_PORT", 6379),
+        "database": config.Env("REDIS_DB", 0),
+        "tls":      &tls.Config{
+            // Add your tls configuration here
+        },
     },
 },
 ```
