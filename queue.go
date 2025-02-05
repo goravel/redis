@@ -8,10 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/queue"
+	"github.com/redis/go-redis/v9"
 )
 
 func init() {

@@ -7,6 +7,7 @@ import (
 )
 
 const CacheBinding = "goravel.redis.cache"
+
 const QueueBinding = "goravel.redis.queue"
 
 var App foundation.Application

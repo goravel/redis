@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cast"
-	"github.com/stretchr/testify/assert"
-
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	configmock "github.com/goravel/framework/mocks/config"
 	ormmock "github.com/goravel/framework/mocks/database/orm"
 	"github.com/goravel/framework/queue"
 	testingdocker "github.com/goravel/framework/support/docker"
+	"github.com/goravel/framework/support/env"
+	"github.com/spf13/cast"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -33,7 +33,7 @@ type QueueTestSuite struct {
 }
 
 func TestQueueTestSuite(t *testing.T) {
-	if testing.Short() {
+	if env.IsWindows() {
 		t.Skip("Skipping tests of using docker")
 	}
 

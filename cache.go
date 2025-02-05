@@ -7,11 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-	"github.com/spf13/cast"
-
 	"github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 )
 
 var _ cache.Driver = &Cache{}
