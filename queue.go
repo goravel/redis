@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/goravel/framework/contracts/config"
@@ -48,7 +47,7 @@ func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, conn
 	})
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, errors.WithMessage(err, "init connection error")
+		return nil, err
 	}
 
 	return &Queue{
