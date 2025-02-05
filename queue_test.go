@@ -11,7 +11,6 @@ import (
 	ormmock "github.com/goravel/framework/mocks/database/orm"
 	"github.com/goravel/framework/queue"
 	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -42,7 +41,7 @@ func TestQueueTestSuite(t *testing.T) {
 	if err != nil {
 		log.Fatalf("Get redis store error: %s", err)
 	}
-	assert.Nil(t, app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}}))
+	app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}})
 
 	suite.Run(t, &QueueTestSuite{
 		app:         app,
@@ -87,7 +86,7 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		worker := s.app.Worker(nil)
+		worker := s.app.Worker()
 		s.Nil(worker.Run())
 
 		<-ctx.Done()
@@ -116,7 +115,7 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		worker := s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(contractsqueue.Args{
 			Queue: "delay",
 		})
 		s.Nil(worker.Run())
@@ -125,7 +124,7 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 		s.Nil(worker.Shutdown())
 	}(ctx)
 	time.Sleep(2 * time.Second)
-	s.Nil(s.app.Job(&TestDelayRedisJob{}, []any{"TestDelayRedisQueue", 1}).OnQueue("delay").Delay(3).Dispatch())
+	s.Nil(s.app.Job(&TestDelayRedisJob{}, []any{"TestDelayRedisQueue", 1}).OnQueue("delay").Delay(time.Now().Add(3 * time.Second)).Dispatch())
 	time.Sleep(2 * time.Second)
 	s.Equal(0, testDelayRedisJob)
 	time.Sleep(3 * time.Second)
@@ -148,7 +147,7 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		worker := s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(contractsqueue.Args{
 			Connection: "custom",
 			Queue:      "custom1",
 			Concurrent: 2,
@@ -181,7 +180,7 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		worker := s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(contractsqueue.Args{
 			Queue: "error",
 		})
 		s.Nil(worker.Run())
@@ -212,7 +211,7 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	go func(ctx context.Context) {
-		worker := s.app.Worker(&contractsqueue.Args{
+		worker := s.app.Worker(contractsqueue.Args{
 			Queue: "chain",
 		})
 		s.Nil(worker.Run())

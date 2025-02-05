@@ -1,7 +1,9 @@
 package redis
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"strconv"
 	"time"
@@ -10,10 +12,12 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/goravel/framework/contracts/config"
-	contractsqueue "github.com/goravel/framework/contracts/queue"
-	"github.com/goravel/framework/queue"
-	"github.com/goravel/framework/support/json"
+	"github.com/goravel/framework/contracts/queue"
 )
+
+func init() {
+	gob.Register(queueData{})
+}
 
 type queueData struct {
 	Signature string `json:"signature"`
@@ -21,26 +25,26 @@ type queueData struct {
 	Attempts  uint   `json:"attempts"`
 }
 
-var _ contractsqueue.Driver = &Queue{}
+var _ queue.Driver = &Queue{}
 
 type Queue struct {
 	ctx        context.Context
-	queue      contractsqueue.Queue
+	queue      queue.Queue
 	instance   *redis.Client
 	connection string
 }
 
-func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, connection string) (*Queue, error) {
-	redisConnection := config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
-	host := config.GetString(fmt.Sprintf("database.redis.%s.host", redisConnection))
+func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, connection string) (*Queue, error) {
+	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
+	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
 	if host == "" {
 		return nil, nil
 	}
 
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", redisConnection))),
-		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", redisConnection)),
-		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", redisConnection)),
+		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
+		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
+		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	})
 
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
@@ -55,36 +59,19 @@ func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Qu
 	}, nil
 }
 
-func (r *Queue) Connection() string {
-	return r.connection
-}
-
-func (r *Queue) Driver() string {
-	return queue.DriverCustom
-}
-
-func (r *Queue) Push(job contractsqueue.Job, args []any, queue string) error {
-	payload, err := r.jobToJSON(job.Signature(), args)
-	if err != nil {
-		return err
-	}
-
-	return r.instance.RPush(r.ctx, queue, payload).Err()
-}
-
-func (r *Queue) Bulk(jobs []contractsqueue.Jobs, queue string) error {
+func (r *Queue) Bulk(jobs []queue.Jobs, queue string) error {
 	pipe := r.instance.Pipeline()
+	now := time.Now()
 
 	for _, job := range jobs {
-		payload, err := r.jobToJSON(job.Job.Signature(), job.Args)
+		payload, err := r.jobToGob(job.Job.Signature(), job.Args)
 		if err != nil {
 			return err
 		}
 
-		if job.Delay > 0 {
-			delayDuration := time.Duration(job.Delay) * time.Second
+		if job.Delay.After(now) {
 			pipe.ZAdd(r.ctx, queue+":delayed", redis.Z{
-				Score:  float64(time.Now().Add(delayDuration).Unix()),
+				Score:  float64(job.Delay.Unix()),
 				Member: payload,
 			})
 		} else {
@@ -96,30 +83,25 @@ func (r *Queue) Bulk(jobs []contractsqueue.Jobs, queue string) error {
 	return err
 }
 
-func (r *Queue) Later(delay uint, job contractsqueue.Job, args []any, queue string) error {
-	payload, err := r.jobToJSON(job.Signature(), args)
-	if err != nil {
-		return err
-	}
-
-	delayDuration := time.Duration(delay) * time.Second
-	return r.instance.ZAdd(r.ctx, queue+":delayed", redis.Z{
-		Score:  float64(time.Now().Add(delayDuration).Unix()),
-		Member: payload,
-	}).Err()
+func (r *Queue) Connection() string {
+	return r.connection
 }
 
-func (r *Queue) Pop(queue string) (contractsqueue.Job, []any, error) {
+func (r *Queue) Driver() string {
+	return queue.DriverCustom
+}
+
+func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
 	if err := r.migrateDelayedJobs(queue); err != nil {
 		return nil, nil, err
 	}
 
-	result, err := r.instance.LPop(r.ctx, queue).Result()
+	result, err := r.instance.LPop(r.ctx, queue).Bytes()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	signature, args, err := r.jsonToJob(result)
+	signature, args, err := r.gobToJob(result)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -129,6 +111,27 @@ func (r *Queue) Pop(queue string) (contractsqueue.Job, []any, error) {
 	}
 
 	return job, args, nil
+}
+
+func (r *Queue) Push(job queue.Job, args []any, queue string) error {
+	payload, err := r.jobToGob(job.Signature(), args)
+	if err != nil {
+		return err
+	}
+
+	return r.instance.RPush(r.ctx, queue, payload).Err()
+}
+
+func (r *Queue) Later(delay time.Time, job queue.Job, args []any, queue string) error {
+	payload, err := r.jobToGob(job.Signature(), args)
+	if err != nil {
+		return err
+	}
+
+	return r.instance.ZAdd(r.ctx, queue+":delayed", redis.Z{
+		Score:  float64(delay.Unix()),
+		Member: payload,
+	}).Err()
 }
 
 func (r *Queue) migrateDelayedJobs(queue string) error {
@@ -155,22 +158,27 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 	return nil
 }
 
-// jobToJSON convert signature and args to JSON
-func (r *Queue) jobToJSON(signature string, args []any) (string, error) {
-	return json.MarshalString(&queueData{
+// jobToGob convert signature and args to Gob
+func (r *Queue) jobToGob(signature string, args []any) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(&queueData{
 		Signature: signature,
 		Args:      args,
 		Attempts:  0,
-	})
+	}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
-// jsonToJob convert JSON to signature and args
-func (r *Queue) jsonToJob(jsonString string) (string, []any, error) {
-	var data queueData
-	err := json.UnmarshalString(jsonString, &data)
-	if err != nil {
+// gobToJob convert Gob to signature and args
+func (r *Queue) gobToJob(src []byte) (string, []any, error) {
+	dst := new(queueData)
+	dec := gob.NewDecoder(bytes.NewBuffer(src))
+	if err := dec.Decode(dst); err != nil {
 		return "", nil, err
 	}
 
-	return data.Signature, data.Args, nil
+	return dst.Signature, dst.Args, nil
 }
