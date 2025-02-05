@@ -85,8 +85,6 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
-	s.mockConfig.EXPECT().GetString("queue.failed.database").Return("database")
-	s.mockConfig.EXPECT().GetString("queue.failed.table").Return("failed_jobs")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -114,8 +112,6 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
-	s.mockConfig.EXPECT().GetString("queue.failed.database").Return("database")
-	s.mockConfig.EXPECT().GetString("queue.failed.table").Return("failed_jobs")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -146,8 +142,6 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
-	s.mockConfig.EXPECT().GetString("queue.failed.database").Return("database")
-	s.mockConfig.EXPECT().GetString("queue.failed.table").Return("failed_jobs")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -179,8 +173,6 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
-	s.mockConfig.EXPECT().GetString("queue.failed.database").Return("database")
-	s.mockConfig.EXPECT().GetString("queue.failed.table").Return("failed_jobs")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -210,8 +202,6 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
-	s.mockConfig.EXPECT().GetString("queue.failed.database").Return("database")
-	s.mockConfig.EXPECT().GetString("queue.failed.table").Return("failed_jobs")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
