@@ -145,7 +145,7 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 
 	pipe := r.instance.TxPipeline()
 	for _, job := range jobs {
-		pipe.RPush(r.ctx, queue, job.Member)
+		pipe.LPush(r.ctx, queue, job.Member)
 		pipe.ZRem(r.ctx, queue+":delayed", job.Member)
 	}
 	_, err = pipe.Exec(r.ctx)
