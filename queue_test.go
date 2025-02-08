@@ -178,7 +178,7 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 }
 
 func (s *QueueTestSuite) TestChainRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Twice()
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Times(3)
 	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Twice()
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
