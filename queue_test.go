@@ -125,6 +125,7 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.default").Return("custom").Times(3)
 	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Times(3)
+	s.mockConfig.EXPECT().GetString("queue.connections.custom.queue", "default").Return("default").Times(3)
 	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom").Times(3)
 	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Times(3)
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Times(3)
