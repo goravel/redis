@@ -12,6 +12,7 @@ import (
 
 	"github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
+	contractshttp "github.com/goravel/framework/contracts/http"
 )
 
 var _ cache.Driver = &Redis{}
@@ -33,6 +34,7 @@ func NewRedis(ctx context.Context, config config.Config, store string) (*Redis, 
 
 	option := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
+		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
 		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	}
@@ -263,6 +265,10 @@ func (r *Redis) RememberForever(key string, callback func() (any, error)) (any, 
 }
 
 func (r *Redis) WithContext(ctx context.Context) cache.Driver {
+	if http, ok := ctx.(contractshttp.Context); ok {
+		ctx = http.Context()
+	}
+
 	store, _ := NewRedis(ctx, r.config, r.store)
 
 	return store
