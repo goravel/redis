@@ -7,7 +7,6 @@ import (
 
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	mocksconfig "github.com/goravel/framework/mocks/config"
-	mocksorm "github.com/goravel/framework/mocks/database/orm"
 	"github.com/goravel/framework/queue"
 	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
@@ -67,14 +66,6 @@ func (s *QueueTestSuite) SetupTest() {
 	testCustomRedisJob = 0
 	testErrorRedisJob = 0
 	testChainRedisJob = 0
-
-	mockOrm := mocksorm.NewOrm(s.T())
-	mockQuery := mocksorm.NewQuery(s.T())
-	mockOrm.EXPECT().Connection("database").Return(mockOrm)
-	mockOrm.EXPECT().Query().Return(mockQuery)
-	mockQuery.EXPECT().Table("failed_jobs").Return(mockQuery)
-
-	queue.OrmFacade = mockOrm
 }
 
 func (s *QueueTestSuite) TestDefaultRedisQueue() {
@@ -187,8 +178,8 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 }
 
 func (s *QueueTestSuite) TestChainRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Once()
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Twice()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Twice()
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
