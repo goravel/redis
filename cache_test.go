@@ -33,6 +33,7 @@ func TestCacheTestSuite(t *testing.T) {
 	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return("default").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 	mockConfig.EXPECT().Get("database.redis.default.tls").Return(nil).Once()

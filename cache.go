@@ -9,6 +9,7 @@ import (
 
 	"github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
+	contractshttp "github.com/goravel/framework/contracts/http"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 )
@@ -32,6 +33,7 @@ func NewCache(ctx context.Context, config config.Config, store string) (*Cache, 
 
 	option := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
+		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
 		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	}
@@ -262,6 +264,10 @@ func (r *Cache) RememberForever(key string, callback func() (any, error)) (any, 
 }
 
 func (r *Cache) WithContext(ctx context.Context) cache.Driver {
+	if http, ok := ctx.(contractshttp.Context); ok {
+		ctx = http.Context()
+	}
+
 	store, _ := NewCache(ctx, r.config, r.store)
 
 	return store
