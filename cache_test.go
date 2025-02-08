@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	configmock "github.com/goravel/framework/mocks/config"
-	testingdocker "github.com/goravel/framework/support/docker"
+	mocksconfig "github.com/goravel/framework/mocks/config"
+	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ import (
 
 type CacheTestSuite struct {
 	suite.Suite
-	mockConfig *configmock.Config
+	mockConfig *mocksconfig.Config
 	redis      *Cache
 }
 
@@ -26,10 +26,10 @@ func TestCacheTestSuite(t *testing.T) {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisDocker := testingdocker.NewRedis()
+	redisDocker := docker.NewRedis()
 	assert.Nil(t, redisDocker.Build())
 
-	mockConfig := &configmock.Config{}
+	mockConfig := &mocksconfig.Config{}
 	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return("default").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
@@ -50,7 +50,7 @@ func TestCacheTestSuite(t *testing.T) {
 }
 
 func (s *CacheTestSuite) SetupTest() {
-	s.mockConfig = &configmock.Config{}
+	s.mockConfig = &mocksconfig.Config{}
 }
 
 func (s *CacheTestSuite) TestAdd() {

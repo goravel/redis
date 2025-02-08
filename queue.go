@@ -36,11 +36,12 @@ func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, conn
 	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
 	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
 	if host == "" {
-		return nil, nil
+		return nil, fmt.Errorf("redis host is not configured for connection %s", connection)
 	}
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
+		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
 		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
 		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
 	})

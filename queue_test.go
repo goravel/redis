@@ -6,10 +6,10 @@ import (
 	"time"
 
 	contractsqueue "github.com/goravel/framework/contracts/queue"
-	configmock "github.com/goravel/framework/mocks/config"
-	ormmock "github.com/goravel/framework/mocks/database/orm"
+	mocksconfig "github.com/goravel/framework/mocks/config"
+	mocksorm "github.com/goravel/framework/mocks/database/orm"
 	"github.com/goravel/framework/queue"
-	testingdocker "github.com/goravel/framework/support/docker"
+	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
@@ -27,9 +27,9 @@ var (
 type QueueTestSuite struct {
 	suite.Suite
 	app         *queue.Application
-	mockConfig  *configmock.Config
+	mockConfig  *mocksconfig.Config
 	redis       *Queue
-	redisDocker *testingdocker.Redis
+	redisDocker *docker.Redis
 }
 
 func TestQueueTestSuite(t *testing.T) {
@@ -37,10 +37,10 @@ func TestQueueTestSuite(t *testing.T) {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisDocker := testingdocker.NewRedis()
+	redisDocker := docker.NewRedis()
 	assert.Nil(t, redisDocker.Build())
 
-	mockConfig := &configmock.Config{}
+	mockConfig := mocksconfig.NewConfig(t)
 	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("default").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
@@ -67,8 +67,8 @@ func (s *QueueTestSuite) SetupTest() {
 	testErrorRedisJob = 0
 	testChainRedisJob = 0
 
-	mockOrm := &ormmock.Orm{}
-	mockQuery := &ormmock.Query{}
+	mockOrm := mocksorm.NewOrm(s.T())
+	mockQuery := mocksorm.NewQuery(s.T())
 	mockOrm.EXPECT().Connection("database").Return(mockOrm)
 	mockOrm.EXPECT().Query().Return(mockQuery)
 	mockQuery.EXPECT().Table("failed_jobs").Return(mockQuery)
@@ -77,142 +77,128 @@ func (s *QueueTestSuite) SetupTest() {
 }
 
 func (s *QueueTestSuite) TestDefaultRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis")
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom")
-	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil })
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Once()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
+	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	worker := s.app.Worker()
+	defer s.Nil(worker.Shutdown())
 	go func(ctx context.Context) {
-		worker := s.app.Worker()
 		s.Nil(worker.Run())
-
-		<-ctx.Done()
-		s.Nil(worker.Shutdown())
 	}(ctx)
+
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestRedisJob{}, []any{"TestDefaultRedisQueue", 1}).Dispatch())
 	time.Sleep(2 * time.Second)
 	s.Equal(1, testRedisJob)
-
-	s.mockConfig.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestDelayRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis")
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom")
-	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil })
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Once()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
+	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	worker := s.app.Worker(contractsqueue.Args{
+		Queue: "delay",
+	})
+	defer s.Nil(worker.Shutdown())
 	go func(ctx context.Context) {
-		worker := s.app.Worker(contractsqueue.Args{
-			Queue: "delay",
-		})
 		s.Nil(worker.Run())
-
-		<-ctx.Done()
-		s.Nil(worker.Shutdown())
 	}(ctx)
+
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestDelayRedisJob{}, []any{"TestDelayRedisQueue", 1}).OnQueue("delay").Delay(time.Now().Add(3 * time.Second)).Dispatch())
 	time.Sleep(2 * time.Second)
 	s.Equal(0, testDelayRedisJob)
 	time.Sleep(3 * time.Second)
 	s.Equal(1, testDelayRedisJob)
-
-	s.mockConfig.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestCustomRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("custom")
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel")
-	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom")
-	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil })
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
+	s.mockConfig.EXPECT().GetString("queue.default").Return("custom").Once()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom").Once()
+	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	worker := s.app.Worker(contractsqueue.Args{
+		Connection: "custom",
+		Queue:      "custom1",
+		Concurrent: 2,
+	})
+	defer s.Nil(worker.Shutdown())
 	go func(ctx context.Context) {
-		worker := s.app.Worker(contractsqueue.Args{
-			Connection: "custom",
-			Queue:      "custom1",
-			Concurrent: 2,
-		})
 		s.Nil(worker.Run())
-
-		<-ctx.Done()
-		s.Nil(worker.Shutdown())
 	}(ctx)
+
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestCustomRedisJob{}, []any{"TestCustomRedisQueue", 1}).OnConnection("custom").OnQueue("custom1").Dispatch())
 	time.Sleep(2 * time.Second)
 	s.Equal(1, testCustomRedisJob)
-
-	s.mockConfig.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestErrorRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis")
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom")
-	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil })
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Once()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
+	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	worker := s.app.Worker(contractsqueue.Args{
+		Queue: "error",
+	})
+	defer s.Nil(worker.Shutdown())
 	go func(ctx context.Context) {
-		worker := s.app.Worker(contractsqueue.Args{
-			Queue: "error",
-		})
 		s.Nil(worker.Run())
-
-		<-ctx.Done()
-		s.Nil(worker.Shutdown())
 	}(ctx)
+
 	time.Sleep(2 * time.Second)
 	s.Nil(s.app.Job(&TestErrorRedisJob{}, []any{"TestErrorRedisQueue", 1}).OnConnection("redis").OnQueue("error1").Dispatch())
 	time.Sleep(2 * time.Second)
 	s.Equal(0, testErrorRedisJob)
-
-	s.mockConfig.AssertExpectations(s.T())
 }
 
 func (s *QueueTestSuite) TestChainRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("redis")
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default")
-	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom")
-	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil })
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost")
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("")
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0)
+	s.mockConfig.EXPECT().GetString("queue.default").Return("redis").Once()
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.queue", "default").Return("default").Once()
+	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
+	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	worker := s.app.Worker(contractsqueue.Args{
+		Queue: "chain",
+	})
+	defer s.Nil(worker.Shutdown())
 	go func(ctx context.Context) {
-		worker := s.app.Worker(contractsqueue.Args{
-			Queue: "chain",
-		})
 		s.Nil(worker.Run())
-
-		<-ctx.Done()
-		s.Nil(worker.Shutdown())
 	}(ctx)
 
 	time.Sleep(2 * time.Second)
@@ -230,8 +216,6 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	time.Sleep(2 * time.Second)
 	s.Equal(1, testChainRedisJob)
 	s.Equal(1, testRedisJob)
-
-	s.mockConfig.AssertExpectations(s.T())
 }
 
 type TestRedisJob struct {

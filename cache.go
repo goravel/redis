@@ -28,7 +28,7 @@ func NewCache(ctx context.Context, config config.Config, store string) (*Cache, 
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
 	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
 	if host == "" {
-		return nil, nil
+		return nil, fmt.Errorf("redis host is not configured for connection %s", connection)
 	}
 
 	option := &redis.Options{
