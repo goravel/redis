@@ -44,6 +44,7 @@ func TestQueueTestSuite(t *testing.T) {
 	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("default").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 	app := queue.NewApplication(mockConfig)
@@ -83,6 +84,7 @@ func (s *QueueTestSuite) TestDefaultRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
@@ -107,6 +109,7 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
@@ -134,6 +137,7 @@ func (s *QueueTestSuite) TestCustomRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
@@ -162,6 +166,7 @@ func (s *QueueTestSuite) TestErrorRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
@@ -188,6 +193,7 @@ func (s *QueueTestSuite) TestChainRedisQueue() {
 	s.mockConfig.EXPECT().GetString("queue.connections.redis.driver").Return("custom").Once()
 	s.mockConfig.EXPECT().Get("queue.connections.redis.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
 	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
 
