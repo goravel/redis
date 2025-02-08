@@ -123,14 +123,14 @@ func (s *QueueTestSuite) TestDelayRedisQueue() {
 }
 
 func (s *QueueTestSuite) TestCustomRedisQueue() {
-	s.mockConfig.EXPECT().GetString("queue.default").Return("custom").Twice()
-	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Twice()
-	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom").Twice()
-	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Twice()
-	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Twice()
-	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Twice()
-	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Twice()
-	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Twice()
+	s.mockConfig.EXPECT().GetString("queue.default").Return("custom").Times(3)
+	s.mockConfig.EXPECT().GetString("app.name").Return("goravel").Times(3)
+	s.mockConfig.EXPECT().GetString("queue.connections.custom.driver").Return("custom").Times(3)
+	s.mockConfig.EXPECT().Get("queue.connections.custom.via").Return(func() (contractsqueue.Driver, error) { return s.redis, nil }).Times(3)
+	s.mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Times(3)
+	s.mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Times(3)
+	s.mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Times(3)
+	s.mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Times(3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
