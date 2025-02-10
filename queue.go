@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/queue"
+	frameworkerrors "github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -97,6 +99,9 @@ func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
 
 	result, err := r.instance.LPop(r.ctx, queue).Bytes()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, nil, frameworkerrors.QueueDriverNoJobFound.Args(queue)
+		}
 		return nil, nil, err
 	}
 
