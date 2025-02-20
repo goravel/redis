@@ -1,6 +1,6 @@
 # Redis
 
-A redis disk driver for `facades.Cache()` of Goravel.
+A redis driver for `facades.Cache()` and `facades.Queue()` of Goravel.
 
 ## Version
 
@@ -26,15 +26,16 @@ import "github.com/goravel/redis"
 
 "providers": []foundation.ServiceProvider{
     ...
-    // Need register redis service provider before cache service provider
+    // Need register redis service provider before cache and queue service provider
     &redis.ServiceProvider{},
    // Exists in the config/app.go file, DO NOT copy this line
     &cache.ServiceProvider{},
+    &queue.ServiceProvider{},
     ...
 }
 ```
 
-3. Add your redis configuration to `config/cache.go` file
+3. Add your redis configuration to `config/cache.go` file if you want to use redis as cache driver
 
 ```
 import (
@@ -48,13 +49,33 @@ import (
         "driver": "custom",
         "connection": "default",
         "via": func() (cache.Driver, error) {
-            return redisfacades.Redis("redis"), nil // The `redis` value is the key of `stores`
+            return redisfacades.Cache("redis"), nil // The `redis` value is the key of `stores`
         },
     },
 },
 ```
 
-4. Fill redis configuration to `config/database.go` file
+4. Add your redis configuration to `config/queue.go` file if you want to use redis as queue driver
+
+```
+import (
+    "github.com/goravel/framework/contracts/queue"
+    redisfacades "github.com/goravel/redis/facades"
+)
+
+"connections": map[string]any{
+    ...
+    "redis": map[string]any{
+        "driver": "custom",
+        "connection": "default",
+        "via": func() (queue.Driver, error) {
+            return redisfacades.Queue("redis"), nil // The `redis` value is the key of `connections`
+        },
+    },
+},
+```
+
+5. Fill redis configuration to `config/database.go` file
 
 ```
 // config/database.go
