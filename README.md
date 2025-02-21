@@ -69,7 +69,7 @@ import (
         "driver": "custom",
         "connection": "default",
         "via": func() (queue.Driver, error) {
-            return redisfacades.Queue("redis"), nil // The `redis` value is the key of `connections`
+            return redisfacades.Queue("redis") // The `redis` value is the key of `connections`
         },
     },
 },
