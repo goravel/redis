@@ -1,28 +1,40 @@
 package facades
 
 import (
-	"log"
-
 	"github.com/goravel/framework/contracts/cache"
+	"github.com/goravel/framework/contracts/queue"
 
 	"github.com/goravel/redis"
 )
 
-func Redis(store string) cache.Driver {
+func Cache(store string) (cache.Driver, error) {
 	if redis.App == nil {
-		log.Fatalln("please register redis service provider")
-		return nil
+		return nil, redis.ErrRedisServiceProviderNotRegistered
 	}
 	if store == "" {
-		log.Fatalln("store is required")
-		return nil
+		return nil, redis.ErrRedisStoreIsRequired
 	}
 
-	instance, err := redis.App.MakeWith(redis.Binding, map[string]any{"store": store})
+	instance, err := redis.App.MakeWith(redis.CacheBinding, map[string]any{"store": store})
 	if err != nil {
-		log.Fatalln(err)
-		return nil
+		return nil, err
 	}
 
-	return instance.(*redis.Redis)
+	return instance.(*redis.Cache), nil
+}
+
+func Queue(connection string) (queue.Driver, error) {
+	if redis.App == nil {
+		return nil, redis.ErrRedisServiceProviderNotRegistered
+	}
+	if connection == "" {
+		return nil, redis.ErrRedisConnectionIsRequired
+	}
+
+	instance, err := redis.App.MakeWith(redis.QueueBinding, map[string]any{"connection": connection})
+	if err != nil {
+		return nil, err
+	}
+
+	return instance.(*redis.Queue), nil
 }
