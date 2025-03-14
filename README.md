@@ -28,7 +28,7 @@ import "github.com/goravel/redis"
     ...
     // Need register redis service provider before cache service provider
     &redis.ServiceProvider{},
-   // Exists in the config/app.go file, DO NOT copy this line
+    // Exists in the config/app.go file, DO NOT copy this line
     &cache.ServiceProvider{},
     ...
 }
