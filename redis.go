@@ -10,11 +10,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 
-	"github.com/goravel/framework/contracts/cache"
+	"github.com/goravel/framework/cache"
+	contractscache "github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
 )
 
-var _ cache.Driver = &Redis{}
+var _ contractscache.Driver = &Redis{}
 
 type Redis struct {
 	ctx      context.Context
@@ -84,14 +85,14 @@ func (r *Redis) Forever(key string, value any) bool {
 	return true
 }
 
-// Forget Remove an item from the cache.
+// Forget Remove an item from the contractscache.
 func (r *Redis) Forget(key string) bool {
 	_, err := r.instance.Del(r.ctx, r.key(key)).Result()
 
 	return err == nil
 }
 
-// Flush Remove all items from the cache.
+// Flush Remove all items from the contractscache.
 func (r *Redis) Flush() bool {
 	res, err := r.instance.FlushAll(r.ctx).Result()
 
@@ -174,7 +175,7 @@ func (r *Redis) GetString(key string, def ...string) string {
 	return cast.ToString(r.Get(key, def[0]))
 }
 
-// Has Check an item exists in the cache.
+// Has Check an item exists in the contractscache.
 func (r *Redis) Has(key string) bool {
 	value, err := r.instance.Exists(r.ctx, r.key(key)).Result()
 
@@ -193,8 +194,8 @@ func (r *Redis) Increment(key string, value ...int64) (int64, error) {
 	return r.instance.IncrBy(r.ctx, r.key(key), value[0]).Result()
 }
 
-func (r *Redis) Lock(key string, t ...time.Duration) cache.Lock {
-	return NewLock(r, key, t...)
+func (r *Redis) Lock(key string, t ...time.Duration) contractscache.Lock {
+	return cache.NewLock(r, key, t...)
 }
 
 // Put Driver an item in the cache for a given time.
@@ -262,7 +263,7 @@ func (r *Redis) RememberForever(key string, callback func() (any, error)) (any, 
 	return val, nil
 }
 
-func (r *Redis) WithContext(ctx context.Context) cache.Driver {
+func (r *Redis) WithContext(ctx context.Context) contractscache.Driver {
 	store, _ := NewRedis(ctx, r.config, r.store)
 
 	return store
