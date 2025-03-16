@@ -7,14 +7,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/goravel/framework/contracts/cache"
+	"github.com/goravel/framework/cache"
+	contractscache "github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
 	contractshttp "github.com/goravel/framework/contracts/http"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 )
 
-var _ cache.Driver = &Cache{}
+var _ contractscache.Driver = &Cache{}
 
 type Cache struct {
 	ctx      context.Context
@@ -194,8 +195,8 @@ func (r *Cache) Increment(key string, value ...int64) (int64, error) {
 	return r.instance.IncrBy(r.ctx, r.key(key), value[0]).Result()
 }
 
-func (r *Cache) Lock(key string, t ...time.Duration) cache.Lock {
-	return NewLock(r, key, t...)
+func (r *Cache) Lock(key string, t ...time.Duration) contractscache.Lock {
+	return cache.NewLock(r, key, t...)
 }
 
 // Put Driver an item in the cache for a given time.
@@ -263,7 +264,7 @@ func (r *Cache) RememberForever(key string, callback func() (any, error)) (any, 
 	return val, nil
 }
 
-func (r *Cache) WithContext(ctx context.Context) cache.Driver {
+func (r *Cache) WithContext(ctx context.Context) contractscache.Driver {
 	if http, ok := ctx.(contractshttp.Context); ok {
 		ctx = http.Context()
 	}
