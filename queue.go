@@ -4,20 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
+	"github.com/goravel/framework/contracts/foundation"
 	"github.com/goravel/framework/contracts/queue"
 	frameworkerrors "github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
 )
-
-func init() {
-	gob.Register(queueData{})
-}
 
 type queueData struct {
 	Signature string `json:"signature"`
@@ -34,7 +30,7 @@ type Queue struct {
 	connection string
 }
 
-func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, connection string) (*Queue, error) {
+func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, json foundation.Json, connection string) (*Queue, error) {
 	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
 	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
 	if host == "" {
@@ -92,14 +88,14 @@ func (r *Queue) Driver() string {
 	return queue.DriverCustom
 }
 
-func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
+func (r *Queue) Pop(queue string) (queue.Job, []queue.Arg, error) {
 	if err := r.migrateDelayedJobs(queue); err != nil {
 		return nil, nil, err
 	}
 
 	result, err := r.instance.LPop(r.ctx, queue).Bytes()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
+		if frameworkerrors.Is(err, redis.Nil) {
 			return nil, nil, frameworkerrors.QueueDriverNoJobFound.Args(queue)
 		}
 		return nil, nil, err
@@ -117,7 +113,7 @@ func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
 	return job, args, nil
 }
 
-func (r *Queue) Push(job queue.Job, args []any, queue string) error {
+func (r *Queue) Push(job queue.Job, args []queue.Arg, queue string) error {
 	payload, err := r.jobToGob(job.Signature(), args)
 	if err != nil {
 		return err
@@ -126,7 +122,7 @@ func (r *Queue) Push(job queue.Job, args []any, queue string) error {
 	return r.instance.RPush(r.ctx, queue, payload).Err()
 }
 
-func (r *Queue) Later(delay time.Time, job queue.Job, args []any, queue string) error {
+func (r *Queue) Later(delay time.Time, job queue.Job, args []queue.Arg, queue string) error {
 	payload, err := r.jobToGob(job.Signature(), args)
 	if err != nil {
 		return err
