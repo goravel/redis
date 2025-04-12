@@ -15,10 +15,16 @@ import (
 	supportredis "github.com/goravel/redis/support/redis"
 )
 
-type task struct {
+type Task struct {
+	Uuid string   `json:"uuid"`
+	Data TaskData `json:"data"`
+}
+
+type TaskData struct {
 	Signature string      `json:"signature"`
 	Args      []queue.Arg `json:"args"`
-	Attempts  uint        `json:"attempts"`
+	Delay     *time.Time  `json:"delay"`
+	Chained   []TaskData  `json:"chained"`
 }
 
 var _ queue.Driver = &Queue{}
@@ -48,30 +54,6 @@ func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, json
 	}, nil
 }
 
-func (r *Queue) Bulk(jobs []queue.Jobs, queue string) error {
-	pipe := r.instance.Pipeline()
-	now := time.Now()
-
-	for _, job := range jobs {
-		payload, err := r.jobToJson(job.Job, job.Args)
-		if err != nil {
-			return err
-		}
-
-		if job.Delay.After(now) {
-			pipe.ZAdd(r.ctx, r.delayQueueKey(queue), redis.Z{
-				Score:  float64(job.Delay.Unix()),
-				Member: payload,
-			})
-		} else {
-			pipe.RPush(r.ctx, queue, payload)
-		}
-	}
-
-	_, err := pipe.Exec(r.ctx)
-	return err
-}
-
 func (r *Queue) Connection() string {
 	return r.connection
 }
@@ -80,8 +62,8 @@ func (r *Queue) Driver() string {
 	return queue.DriverCustom
 }
 
-func (r *Queue) Later(delay time.Time, job queue.Job, args []queue.Arg, queue string) error {
-	payload, err := r.jobToJson(job, args)
+func (r *Queue) Later(delay time.Time, task queue.Task, queue string) error {
+	payload, err := r.taskToJson(task)
 	if err != nil {
 		return err
 	}
@@ -92,29 +74,37 @@ func (r *Queue) Later(delay time.Time, job queue.Job, args []queue.Arg, queue st
 	}).Err()
 }
 
-func (r *Queue) Pop(queue string) (queue.Job, []queue.Arg, error) {
+func (r *Queue) Name() string {
+	return Name
+}
+
+func (r *Queue) Pop(queue string) (*queue.Task, error) {
 	if err := r.migrateDelayedJobs(queue); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	result, err := r.instance.LPop(r.ctx, queue).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return nil, nil, errors.QueueDriverNoJobFound.Args(queue)
+			return nil, errors.QueueDriverNoJobFound.Args(queue)
 		}
-		return nil, nil, err
+		return nil, err
 	}
 
-	job, args, err := r.jsonToJob(result)
+	task, err := r.jsonToTask(result)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return job, args, nil
+	return task, nil
 }
 
-func (r *Queue) Push(job queue.Job, args []queue.Arg, queue string) error {
-	payload, err := r.jobToJson(job, args)
+func (r *Queue) Push(task queue.Task, queue string) error {
+	if task.Data.Delay != nil && !task.Data.Delay.IsZero() {
+		return r.Later(*task.Data.Delay, task, queue)
+	}
+
+	payload, err := r.taskToJson(task)
 	if err != nil {
 		return err
 	}
@@ -126,12 +116,26 @@ func (r *Queue) delayQueueKey(queue string) string {
 	return fmt.Sprintf("%s:delayed", queue)
 }
 
-// jobToJson converts job and args to json
-func (r *Queue) jobToJson(job queue.Job, args []queue.Arg) ([]byte, error) {
-	payload, err := r.json.Marshal(&task{
-		Signature: job.Signature(),
-		Args:      args,
-		Attempts:  0,
+func (r *Queue) taskToJson(task queue.Task) ([]byte, error) {
+	chained := make([]TaskData, len(task.Data.Chained))
+	for i, taskData := range task.Data.Chained {
+		chained[i] = TaskData{
+			Signature: taskData.Job.Signature(),
+			Args:      taskData.Args,
+			Delay:     taskData.Delay,
+		}
+	}
+
+	taskData := TaskData{
+		Signature: task.Data.Job.Signature(),
+		Args:      task.Data.Args,
+		Delay:     task.Data.Delay,
+		Chained:   chained,
+	}
+
+	payload, err := r.json.Marshal(&Task{
+		Uuid: task.Uuid,
+		Data: taskData,
 	})
 	if err != nil {
 		return nil, err
@@ -140,19 +144,40 @@ func (r *Queue) jobToJson(job queue.Job, args []queue.Arg) ([]byte, error) {
 	return payload, nil
 }
 
-// jsonToJob converts json to job and args
-func (r *Queue) jsonToJob(payload string) (queue.Job, []queue.Arg, error) {
-	var dst task
-	if err := r.json.Unmarshal([]byte(payload), &dst); err != nil {
-		return nil, nil, err
+func (r *Queue) jsonToTask(payload string) (*queue.Task, error) {
+	var task Task
+	if err := r.json.Unmarshal([]byte(payload), &task); err != nil {
+		return nil, err
 	}
 
-	job, err := r.queue.GetJob(dst.Signature)
+	chained := make([]queue.TaskData, len(task.Data.Chained))
+	for i, taskData := range task.Data.Chained {
+		job, err := r.queue.GetJob(taskData.Signature)
+		if err != nil {
+			return nil, err
+		}
+
+		chained[i] = queue.TaskData{
+			Job:   job,
+			Args:  taskData.Args,
+			Delay: taskData.Delay,
+		}
+	}
+
+	job, err := r.queue.GetJob(task.Data.Signature)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return job, dst.Args, nil
+	return &queue.Task{
+		Uuid: task.Uuid,
+		Data: queue.TaskData{
+			Job:     job,
+			Args:    task.Data.Args,
+			Delay:   task.Data.Delay,
+			Chained: chained,
+		},
+	}, nil
 }
 
 func (r *Queue) migrateDelayedJobs(queue string) error {

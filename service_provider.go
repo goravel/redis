@@ -11,6 +11,8 @@ const (
 	CacheBinding   = "goravel.redis.cache"
 	QueueBinding   = "goravel.redis.queue"
 	SessionBinding = "goravel.redis.session"
+
+	Name = "redis"
 )
 
 var App foundation.Application
