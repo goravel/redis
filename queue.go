@@ -11,6 +11,7 @@ import (
 	"github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 
 	supportredis "github.com/goravel/redis/support/redis"
 )
@@ -119,6 +120,13 @@ func (r *Queue) delayQueueKey(queue string) string {
 func (r *Queue) taskToJson(task queue.Task) ([]byte, error) {
 	chained := make([]TaskData, len(task.Data.Chained))
 	for i, taskData := range task.Data.Chained {
+		for j, arg := range taskData.Args {
+			// To avoid converting []uint8 to base64
+			if arg.Type == "[]uint8" {
+				taskData.Args[j].Value = cast.ToIntSlice(arg.Value)
+			}
+		}
+
 		chained[i] = TaskData{
 			Signature: taskData.Job.Signature(),
 			Args:      taskData.Args,
