@@ -8,7 +8,7 @@ import (
 
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/foundation"
-	"github.com/goravel/framework/contracts/queue"
+	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
@@ -17,28 +17,28 @@ import (
 )
 
 type Task struct {
-	Uuid string   `json:"uuid"`
-	Data TaskData `json:"data"`
+	Job
+	Uuid  string `json:"uuid"`
+	Chain []Job  `json:"chain"`
 }
 
-type TaskData struct {
-	Signature string      `json:"signature"`
-	Args      []queue.Arg `json:"args"`
-	Delay     *time.Time  `json:"delay"`
-	Chained   []TaskData  `json:"chained"`
+type Job struct {
+	Signature string               `json:"signature"`
+	Args      []contractsqueue.Arg `json:"args"`
+	Delay     *time.Time           `json:"delay"`
 }
 
-var _ queue.Driver = &Queue{}
+var _ contractsqueue.Driver = &Queue{}
 
 type Queue struct {
 	connection string
 	ctx        context.Context
 	json       foundation.Json
-	queue      queue.Queue
+	queue      contractsqueue.Queue
 	instance   *redis.Client
 }
 
-func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, json foundation.Json, connection string) (*Queue, error) {
+func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, json foundation.Json, connection string) (*Queue, error) {
 	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
 
 	client, err := supportredis.GetClient(config, connection)
@@ -60,10 +60,10 @@ func (r *Queue) Connection() string {
 }
 
 func (r *Queue) Driver() string {
-	return queue.DriverCustom
+	return contractsqueue.DriverCustom
 }
 
-func (r *Queue) Later(delay time.Time, task queue.Task, queue string) error {
+func (r *Queue) Later(delay time.Time, task contractsqueue.Task, queue string) error {
 	payload, err := r.taskToJson(task)
 	if err != nil {
 		return err
@@ -79,30 +79,25 @@ func (r *Queue) Name() string {
 	return Name
 }
 
-func (r *Queue) Pop(queue string) (*queue.Task, error) {
+func (r *Queue) Pop(queue string) (contractsqueue.Task, error) {
 	if err := r.migrateDelayedJobs(queue); err != nil {
-		return nil, err
+		return contractsqueue.Task{}, err
 	}
 
 	result, err := r.instance.LPop(r.ctx, queue).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return nil, errors.QueueDriverNoJobFound.Args(queue)
+			return contractsqueue.Task{}, errors.QueueDriverNoJobFound.Args(queue)
 		}
-		return nil, err
+		return contractsqueue.Task{}, err
 	}
 
-	task, err := r.jsonToTask(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return task, nil
+	return r.jsonToTask(result)
 }
 
-func (r *Queue) Push(task queue.Task, queue string) error {
-	if task.Data.Delay != nil && !task.Data.Delay.IsZero() {
-		return r.Later(*task.Data.Delay, task, queue)
+func (r *Queue) Push(task contractsqueue.Task, queue string) error {
+	if !task.Delay.IsZero() {
+		return r.Later(task.Delay, task, queue)
 	}
 
 	payload, err := r.taskToJson(task)
@@ -117,9 +112,9 @@ func (r *Queue) delayQueueKey(queue string) string {
 	return fmt.Sprintf("%s:delayed", queue)
 }
 
-func (r *Queue) taskToJson(task queue.Task) ([]byte, error) {
-	chained := make([]TaskData, len(task.Data.Chained))
-	for i, taskData := range task.Data.Chained {
+func (r *Queue) taskToJson(task contractsqueue.Task) ([]byte, error) {
+	chain := make([]Job, len(task.Chain))
+	for i, taskData := range task.Chain {
 		for j, arg := range taskData.Args {
 			// To avoid converting []uint8 to base64
 			if arg.Type == "[]uint8" {
@@ -127,24 +122,37 @@ func (r *Queue) taskToJson(task queue.Task) ([]byte, error) {
 			}
 		}
 
-		chained[i] = TaskData{
+		job := Job{
 			Signature: taskData.Job.Signature(),
 			Args:      taskData.Args,
-			Delay:     taskData.Delay,
 		}
+
+		if !taskData.Delay.IsZero() {
+			job.Delay = &taskData.Delay
+		}
+
+		chain[i] = job
 	}
 
-	taskData := TaskData{
-		Signature: task.Data.Job.Signature(),
-		Args:      task.Data.Args,
-		Delay:     task.Data.Delay,
-		Chained:   chained,
+	job := Job{
+		Signature: task.Job.Signature(),
+		Args:      task.Args,
 	}
 
-	payload, err := r.json.Marshal(&Task{
+	if !task.Delay.IsZero() {
+		job.Delay = &task.Delay
+	}
+
+	t := Task{
 		Uuid: task.Uuid,
-		Data: taskData,
-	})
+		Job: Job{
+			Signature: task.Job.Signature(),
+			Args:      task.Args,
+		},
+		Chain: chain,
+	}
+
+	payload, err := r.json.Marshal(t)
 	if err != nil {
 		return nil, err
 	}
@@ -152,39 +160,49 @@ func (r *Queue) taskToJson(task queue.Task) ([]byte, error) {
 	return payload, nil
 }
 
-func (r *Queue) jsonToTask(payload string) (*queue.Task, error) {
+func (r *Queue) jsonToTask(payload string) (contractsqueue.Task, error) {
 	var task Task
 	if err := r.json.Unmarshal([]byte(payload), &task); err != nil {
-		return nil, err
+		return contractsqueue.Task{}, err
 	}
 
-	chained := make([]queue.TaskData, len(task.Data.Chained))
-	for i, taskData := range task.Data.Chained {
-		job, err := r.queue.GetJob(taskData.Signature)
+	chain := make([]contractsqueue.Jobs, len(task.Chain))
+	for i, item := range task.Chain {
+		job, err := r.queue.GetJob(item.Signature)
 		if err != nil {
-			return nil, err
+			return contractsqueue.Task{}, err
 		}
 
-		chained[i] = queue.TaskData{
-			Job:   job,
-			Args:  taskData.Args,
-			Delay: taskData.Delay,
+		jobs := contractsqueue.Jobs{
+			Job:  job,
+			Args: item.Args,
 		}
+
+		if item.Delay != nil && !item.Delay.IsZero() {
+			jobs.Delay = *item.Delay
+		}
+
+		chain[i] = jobs
 	}
 
-	job, err := r.queue.GetJob(task.Data.Signature)
+	job, err := r.queue.GetJob(task.Signature)
 	if err != nil {
-		return nil, err
+		return contractsqueue.Task{}, err
 	}
 
-	return &queue.Task{
-		Uuid: task.Uuid,
-		Data: queue.TaskData{
-			Job:     job,
-			Args:    task.Data.Args,
-			Delay:   task.Data.Delay,
-			Chained: chained,
-		},
+	jobs := contractsqueue.Jobs{
+		Job:  job,
+		Args: task.Args,
+	}
+
+	if task.Delay != nil && !task.Delay.IsZero() {
+		jobs.Delay = *task.Delay
+	}
+
+	return contractsqueue.Task{
+		Uuid:  task.Uuid,
+		Jobs:  jobs,
+		Chain: chain,
 	}, nil
 }
 

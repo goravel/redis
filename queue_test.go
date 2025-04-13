@@ -10,7 +10,6 @@ import (
 	"github.com/goravel/framework/foundation/json"
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	mocksqueue "github.com/goravel/framework/mocks/queue"
-	"github.com/goravel/framework/support/convert"
 	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
 	"github.com/redis/go-redis/v9"
@@ -83,16 +82,15 @@ func (s *QueueTestSuite) TestPush() {
 		queueKey := "no-delay"
 		task := queue.Task{
 			Uuid: "865111de-ff50-4652-9733-72fea655f836",
-			Data: queue.TaskData{
-				Job:   &MockJob{},
-				Args:  mockArgs,
-				Delay: nil,
-				Chained: []queue.TaskData{
-					{
-						Job:   &MockJob{},
-						Args:  mockArgs,
-						Delay: convert.Pointer(time.Now().Add(1 * time.Hour)),
-					},
+			Jobs: queue.Jobs{
+				Job:  &MockJob{},
+				Args: mockArgs,
+			},
+			Chain: []queue.Jobs{
+				{
+					Job:   &MockJob{},
+					Args:  mockArgs,
+					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
 		}
@@ -112,16 +110,16 @@ func (s *QueueTestSuite) TestPush() {
 		queueKey := "delay"
 		task := queue.Task{
 			Uuid: "865111de-ff50-4652-9733-72fea655f836",
-			Data: queue.TaskData{
+			Jobs: queue.Jobs{
 				Job:   &MockJob{},
 				Args:  mockArgs,
-				Delay: convert.Pointer(time.Now().Add(2 * time.Second)),
-				Chained: []queue.TaskData{
-					{
-						Job:   &MockJob{},
-						Args:  mockArgs,
-						Delay: convert.Pointer(time.Now().Add(1 * time.Hour)),
-					},
+				Delay: time.Now().Add(2 * time.Second),
+			},
+			Chain: []queue.Jobs{
+				{
+					Job:   &MockJob{},
+					Args:  mockArgs,
+					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
 		}
@@ -150,40 +148,39 @@ func (s *QueueTestSuite) TestPop() {
 		queueKey := "pop"
 		task := queue.Task{
 			Uuid: "865111de-ff50-4652-9733-72fea655f836",
-			Data: queue.TaskData{
-				Job:   &MockJob{},
-				Args:  mockArgs,
-				Delay: nil,
-				Chained: []queue.TaskData{
-					{
-						Job:   &MockJob{},
-						Args:  mockArgs,
-						Delay: convert.Pointer(time.Now().Add(1 * time.Hour)),
-					},
+			Jobs: queue.Jobs{
+				Job:  &MockJob{},
+				Args: mockArgs,
+			},
+			Chain: []queue.Jobs{
+				{
+					Job:   &MockJob{},
+					Args:  mockArgs,
+					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
 		}
 
 		s.NoError(s.queue.Push(task, queueKey))
 
-		s.mockQueue.EXPECT().GetJob(task.Data.Job.Signature()).Return(&MockJob{}, nil).Twice()
+		s.mockQueue.EXPECT().GetJob(task.Job.Signature()).Return(&MockJob{}, nil).Twice()
 		task1, err := s.queue.Pop(queueKey)
 
 		s.NoError(err)
-		s.Equal(task.Data.Job.Signature(), task1.Data.Job.Signature())
-		s.Equal(len(task.Data.Args), len(task1.Data.Args))
-		for i, arg := range task1.Data.Args {
-			s.Equal(task.Data.Args[i].Type, arg.Type)
+		s.Equal(task.Job.Signature(), task1.Job.Signature())
+		s.Equal(len(task.Args), len(task1.Args))
+		for i, arg := range task1.Args {
+			s.Equal(task.Args[i].Type, arg.Type)
 		}
-		s.Equal(task.Data.Delay, task1.Data.Delay)
-		s.Len(task1.Data.Chained, 1)
-		for i, chained := range task1.Data.Chained {
-			s.Equal(task.Data.Chained[i].Job.Signature(), chained.Job.Signature())
-			s.Equal(len(task.Data.Chained[i].Args), len(chained.Args))
+		s.Equal(task.Delay, task1.Delay)
+		s.Len(task1.Chain, 1)
+		for i, chained := range task1.Chain {
+			s.Equal(task.Chain[i].Job.Signature(), chained.Job.Signature())
+			s.Equal(len(task.Chain[i].Args), len(chained.Args))
 			for j, arg := range chained.Args {
-				s.Equal(task.Data.Chained[i].Args[j].Type, arg.Type)
+				s.Equal(task.Chain[i].Args[j].Type, arg.Type)
 			}
-			s.Equal(task.Data.Chained[i].Delay.Format(time.RFC3339), chained.Delay.Format(time.RFC3339))
+			s.Equal(task.Chain[i].Delay.Format(time.RFC3339), chained.Delay.Format(time.RFC3339))
 		}
 
 		count, err := s.queue.instance.LLen(context.Background(), queueKey).Result()
@@ -196,16 +193,15 @@ func (s *QueueTestSuite) TestLater() {
 	queueKey := "later"
 	task := queue.Task{
 		Uuid: "865111de-ff50-4652-9733-72fea655f836",
-		Data: queue.TaskData{
-			Job:   &MockJob{},
-			Args:  mockArgs,
-			Delay: convert.Pointer(time.Now().Add(2 * time.Second)),
-			Chained: []queue.TaskData{
-				{
-					Job:   &MockJob{},
-					Args:  mockArgs,
-					Delay: convert.Pointer(time.Now().Add(1 * time.Hour)),
-				},
+		Jobs: queue.Jobs{
+			Job:  &MockJob{},
+			Args: mockArgs,
+		},
+		Chain: []queue.Jobs{
+			{
+				Job:   &MockJob{},
+				Args:  mockArgs,
+				Delay: time.Now().Add(1 * time.Hour),
 			},
 		},
 	}
@@ -227,11 +223,11 @@ func (s *QueueTestSuite) TestLater() {
 
 	time.Sleep(3 * time.Second)
 
-	s.mockQueue.EXPECT().GetJob(task.Data.Job.Signature()).Return(&MockJob{}, nil).Twice()
+	s.mockQueue.EXPECT().GetJob(task.Job.Signature()).Return(&MockJob{}, nil).Twice()
 	task1, err = s.queue.Pop(queueKey)
 	s.NoError(err)
 	s.NotNil(task1)
-	s.Equal(task.Data.Job.Signature(), task1.Data.Job.Signature())
+	s.Equal(task.Job.Signature(), task1.Job.Signature())
 
 	count, err = s.queue.instance.LLen(context.Background(), queueKey).Result()
 	s.NoError(err)
