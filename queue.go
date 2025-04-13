@@ -144,11 +144,8 @@ func (r *Queue) taskToJson(task contractsqueue.Task) ([]byte, error) {
 	}
 
 	t := Task{
-		Uuid: task.Uuid,
-		Job: Job{
-			Signature: task.Job.Signature(),
-			Args:      task.Args,
-		},
+		Uuid:  task.Uuid,
+		Job:   job,
 		Chain: chain,
 	}
 
