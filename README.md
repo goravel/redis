@@ -6,9 +6,9 @@ A redis driver for `facades.Cache()`, `facades.Queue()` and `facades.Session()` 
 
 | goravel/redis | goravel/framework |
 | ------------- | ----------------- |
-| v1.2.\*       | v1.14.\*          |
-| v1.1.\*       | v1.13.\*          |
-| v1.0.\*       | v1.12.\*          |
+| v1.2.*       | v1.14.*          |
+| v1.1.*       | v1.13.*          |
+| v1.0.*       | v1.12.*          |
 
 ## Install
 
