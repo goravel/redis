@@ -134,9 +134,17 @@ func (r *Queue) taskToJson(task contractsqueue.Task) ([]byte, error) {
 		chain[i] = job
 	}
 
+	var args []contractsqueue.Arg
+	for _, arg := range task.Args {
+		if arg.Type == "[]uint8" {
+			arg.Value = cast.ToIntSlice(arg.Value)
+		}
+		args = append(args, arg)
+	}
+
 	job := Job{
 		Signature: task.Job.Signature(),
-		Args:      task.Args,
+		Args:      args,
 	}
 
 	if !task.Delay.IsZero() {
