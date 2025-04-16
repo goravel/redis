@@ -12,6 +12,7 @@ import (
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,10 +26,9 @@ var (
 
 type QueueTestSuite struct {
 	suite.Suite
-	app         *queue.Application
-	mockConfig  *mocksconfig.Config
-	redis       *Queue
-	redisDocker *docker.Redis
+	app        *queue.Application
+	mockConfig *mocksconfig.Config
+	redis      *Queue
 }
 
 func TestQueueTestSuite(t *testing.T) {
@@ -42,10 +42,11 @@ func TestQueueTestSuite(t *testing.T) {
 	mockConfig := mocksconfig.NewConfig(t)
 	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("default").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
 	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
 	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
+	mockConfig.EXPECT().GetInt("database.redis.default.database", 0).Return(0).Once()
+	mockConfig.EXPECT().Get("database.redis.default.tls").Return(nil).Once()
 	app := queue.NewApplication(mockConfig)
 	app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}})
 
@@ -53,11 +54,12 @@ func TestQueueTestSuite(t *testing.T) {
 	assert.Nil(t, err)
 
 	suite.Run(t, &QueueTestSuite{
-		app:         app,
-		mockConfig:  mockConfig,
-		redisDocker: redisDocker,
-		redis:       redis,
+		app:        app,
+		mockConfig: mockConfig,
+		redis:      redis,
 	})
+
+	require.NoError(t, redisDocker.Shutdown(), "Failed to shutdown Redis Docker container")
 }
 
 func (s *QueueTestSuite) SetupTest() {

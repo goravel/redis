@@ -2,17 +2,19 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 
 	"github.com/goravel/framework/cache"
 	contractscache "github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
 	contractshttp "github.com/goravel/framework/contracts/http"
-	"github.com/redis/go-redis/v9"
-	"github.com/spf13/cast"
+
+	supportredis "github.com/goravel/redis/support/redis"
 )
 
 var _ contractscache.Driver = &Cache{}
@@ -27,27 +29,10 @@ type Cache struct {
 
 func NewCache(ctx context.Context, config config.Config, store string) (*Cache, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
-	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
-	if host == "" {
-		return nil, fmt.Errorf("redis host is not configured for connection %s", connection)
-	}
 
-	option := &redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
-		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
-		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
-		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
-	}
-
-	tlsConfig, ok := config.Get(fmt.Sprintf("database.redis.%s.tls", connection)).(*tls.Config)
-	if ok {
-		option.TLSConfig = tlsConfig
-	}
-
-	client := redis.NewClient(option)
-
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, fmt.Errorf("init connection error: %w", err)
+	client, err := supportredis.GetClient(config, connection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}
 
 	return &Cache{
