@@ -63,6 +63,10 @@ func (r *Queue) Driver() string {
 	return contractsqueue.DriverCustom
 }
 
+func (r *Queue) Instance() *redis.Client {
+	return r.instance
+}
+
 func (r *Queue) Later(delay time.Time, task contractsqueue.Task, queue string) error {
 	payload, err := r.taskToJson(task)
 	if err != nil {
