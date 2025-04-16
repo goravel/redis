@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/session"
+
+	supportredis "github.com/goravel/redis/support/redis"
 )
 
 // Ensure Redis driver satisfies the session.Driver interface at compile time.
@@ -25,42 +26,13 @@ type Session struct {
 }
 
 // NewRedis creates a new Redis session driver using Goravel's configuration.
-func NewSession(ctx context.Context, config config.Config, connection string) (*Session, error) {
+func NewSession(ctx context.Context, config config.Config, driver string) (*Session, error) {
 
-	if connection == "" {
-		connection = "default"
-	}
+	connection := config.GetString(fmt.Sprintf("session.drivers.%s.connection", driver), "default")
 
-	redisConfigPath := fmt.Sprintf("database.redis.%s", connection)
-	host := config.GetString(fmt.Sprintf("%s.host", redisConfigPath))
-	port := config.GetString(fmt.Sprintf("%s.port", redisConfigPath), "6379")
-	password := config.GetString(fmt.Sprintf("%s.password", redisConfigPath))
-	db := config.GetInt(fmt.Sprintf("%s.database", redisConfigPath), 0)
-
-	if host == "" {
-		return nil, fmt.Errorf("redis host is not configured for connection [%s]", connection)
-	}
-
-	option := &redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
-		Password: password,
-		DB:       db,
-	}
-
-	tlsConfig, ok := config.Get(fmt.Sprintf("%s.tls", redisConfigPath)).(*tls.Config)
-	if ok && tlsConfig != nil {
-		option.TLSConfig = tlsConfig
-	}
-
-	client := redis.NewClient(option)
-
-	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if _, err := client.Ping(pingCtx).Result(); err != nil {
-
-		_ = client.Close()
-		return nil, fmt.Errorf("failed to connect to redis connection [%s] (%s): %w", connection, option.Addr, err)
+	client, err := supportredis.GetClient(config, connection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}
 
 	lifetimeMinutes := config.GetInt("session.lifetime", 120)
@@ -79,9 +51,11 @@ func NewSession(ctx context.Context, config config.Config, connection string) (*
 
 // Close closes the Redis client connection.
 func (r *Session) Close() error {
-	if r.instance != nil {
-		return r.instance.Close()
-	}
+	// This can affect other parts of the application using the same Redis client.
+	// If you want to close the client, we need to be sure that no other part of the application is using it.
+	// if r.instance != nil {
+	// 	return r.instance.Close()
+	// }
 	return nil
 }
 

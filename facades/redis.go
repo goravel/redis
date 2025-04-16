@@ -40,15 +40,15 @@ func Queue(connection string) (queue.Driver, error) {
 	return instance.(*redis.Queue), nil
 }
 
-func Session(connection string) (session.Driver, error) {
+func Session(driver string) (session.Driver, error) {
 	if redis.App == nil {
 		return nil, redis.ErrRedisServiceProviderNotRegistered
 	}
-	if connection == "" {
+	if driver == "" {
 		return nil, redis.ErrRedisConnectionIsRequired
 	}
 
-	instance, err := redis.App.MakeWith(redis.SessionBinding, map[string]any{"connection": connection})
+	instance, err := redis.App.MakeWith(redis.SessionBinding, map[string]any{"driver": driver})
 	if err != nil {
 		return nil, err
 	}

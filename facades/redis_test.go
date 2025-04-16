@@ -2,48 +2,54 @@ package facades
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	configmock "github.com/goravel/framework/mocks/config"
-	foundationmock "github.com/goravel/framework/mocks/foundation"
-	queuemock "github.com/goravel/framework/mocks/queue"
+	mocksconfig "github.com/goravel/framework/mocks/config"
+	mocksfoundation "github.com/goravel/framework/mocks/foundation"
+	mocksqueue "github.com/goravel/framework/mocks/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	redisdriver "github.com/goravel/redis"
+	"github.com/goravel/redis"
 )
 
 func TestMakingSessionWithRealImplementation(t *testing.T) {
 
-	mockApp := foundationmock.NewApplication(t)
-	mockConfig := configmock.NewConfig(t)
+	mockApp := mocksfoundation.NewApplication(t)
+	mockConfig := mocksconfig.NewConfig(t)
+	mockConfig.ExpectedCalls = nil
 
-	mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-	mockConfig.On("GetString", "database.redis.default.port", "6379").Return("6379").Once()
-	mockConfig.On("GetString", "database.redis.default.password").Return("").Once()
-	mockConfig.On("GetString", "database.redis.default.username").Return("").Once()
-	mockConfig.On("GetInt", "database.redis.default.database", 0).Return(0).Once()
-	mockConfig.On("Get", "database.redis.default.tls").Return(nil).Once()
+	connectionName := "session_default"
+
+	mockConfig.On("GetString", fmt.Sprintf("session.drivers.%s.connection", connectionName), "default").Return(connectionName).Once()
+
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connectionName)).Return("localhost").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", connectionName), "6379").Return("6379").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
+	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
 
 	mockConfig.On("GetInt", "session.lifetime", 120).Return(120).Once()
 	mockConfig.On("GetString", "session.cookie", "goravel_session").Return("goravel_session_test_redis").Once()
 
-	originalApp := redisdriver.App
+	originalApp := redis.App
 	defer func() {
-		redisdriver.App = originalApp
+		redis.App = originalApp
 	}()
-	redisdriver.App = mockApp
+	redis.App = mockApp
 
-	realSessionsInstance, err := redisdriver.NewSession(context.Background(), mockConfig, "default")
+	realSessionsInstance, err := redis.NewSession(context.Background(), mockConfig, connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return
 	}
 
-	mockApp.On("MakeWith", redisdriver.SessionBinding, map[string]any{"connection": "default"}).
+	mockApp.EXPECT().MakeWith(redis.SessionBinding, map[string]any{"driver": connectionName}).
 		Return(realSessionsInstance, nil)
 
-	driver, err := Session("default")
+	driver, err := Session(connectionName)
 	require.NoError(t, err)
 
 	require.NotNil(t, driver)
@@ -56,36 +62,39 @@ func TestMakingSessionWithRealImplementation(t *testing.T) {
 
 func TestMakingCacheWithRealImplementation(t *testing.T) {
 
-	mockApp := foundationmock.NewApplication(t)
-	mockConfig := configmock.NewConfig(t)
+	mockApp := mocksfoundation.NewApplication(t)
+	mockConfig := mocksconfig.NewConfig(t)
+	mockConfig.ExpectedCalls = nil
 
-	mockConfig.On("GetString", "cache.stores.redis.connection", "default").Return("default").Once()
+	connectionName := "cache_default"
 
-	mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-	mockConfig.On("GetString", "database.redis.default.port").Return("6379").Once()
-	mockConfig.On("GetString", "database.redis.default.username").Return("").Once()
-	mockConfig.On("GetString", "database.redis.default.password").Return("").Once()
-	mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
-	mockConfig.On("Get", "database.redis.default.tls").Return(nil).Once()
+	mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", connectionName), "default").Return(connectionName).Once()
+
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connectionName)).Return("localhost").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", connectionName), "6379").Return("6379").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
+	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
 
 	mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
 
-	originalApp := redisdriver.App
+	originalApp := redis.App
 	defer func() {
-		redisdriver.App = originalApp
+		redis.App = originalApp
 	}()
-	redisdriver.App = mockApp
+	redis.App = mockApp
 
-	realCacheInstance, err := redisdriver.NewCache(context.Background(), mockConfig, "redis")
+	realCacheInstance, err := redis.NewCache(context.Background(), mockConfig, connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return
 	}
 
-	mockApp.On("MakeWith", redisdriver.CacheBinding, map[string]any{"store": "redis"}).
+	mockApp.EXPECT().MakeWith(redis.CacheBinding, map[string]any{"store": connectionName}).
 		Return(realCacheInstance, nil)
 
-	store, err := Cache("redis")
+	store, err := Cache(connectionName)
 	require.NoError(t, err)
 
 	require.NotNil(t, store)
@@ -94,35 +103,39 @@ func TestMakingCacheWithRealImplementation(t *testing.T) {
 
 func TestMakingQueueWithRealImplementation(t *testing.T) {
 
-	mockApp := foundationmock.NewApplication(t)
-	mockConfig := configmock.NewConfig(t)
+	mockApp := mocksfoundation.NewApplication(t)
+	mockConfig := mocksconfig.NewConfig(t)
+	mockConfig.ExpectedCalls = nil
 
-	mockConfig.On("GetString", "queue.connections.default.connection", "default").Return("default").Once()
+	connectionName := "queue_default"
 
-	mockConfig.On("GetString", "database.redis.default.host").Return("localhost").Once()
-	mockConfig.On("GetString", "database.redis.default.port").Return("6379").Once()
-	mockConfig.On("GetString", "database.redis.default.username").Return("").Once()
-	mockConfig.On("GetString", "database.redis.default.password").Return("").Once()
-	mockConfig.On("GetInt", "database.redis.default.database").Return(0).Once()
+	mockConfig.On("GetString", fmt.Sprintf("queue.connections.%s.connection", connectionName), "default").Return(connectionName).Once()
 
-	originalApp := redisdriver.App
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connectionName)).Return("localhost").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", connectionName), "6379").Return("6379").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
+	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
+
+	originalApp := redis.App
 	defer func() {
-		redisdriver.App = originalApp
+		redis.App = originalApp
 	}()
-	redisdriver.App = mockApp
+	redis.App = mockApp
 
-	queue := queuemock.NewQueue(t)
+	queue := mocksqueue.NewQueue(t)
 
-	realQueueInstance, err := redisdriver.NewQueue(context.Background(), mockConfig, queue, "default")
+	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, queue, connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return
 	}
 
-	mockApp.On("MakeWith", redisdriver.QueueBinding, map[string]any{"connection": "default"}).
+	mockApp.EXPECT().MakeWith(redis.QueueBinding, map[string]any{"connection": connectionName}).
 		Return(realQueueInstance, nil)
 
-	store, err := Queue("default")
+	store, err := Queue(connectionName)
 	require.NoError(t, err)
 
 	require.NotNil(t, store)

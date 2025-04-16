@@ -91,7 +91,7 @@ import (
         "driver": "custom",
         "connection": "default",
         "via": func() (session.Driver, error) {
-            return redisfacades.Session("default")
+            return redisfacades.Session("redis")
         },
     },
 },

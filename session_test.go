@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
+	mocksconfig "github.com/goravel/framework/mocks/config"
+	"github.com/goravel/framework/support/docker"
+	"github.com/goravel/framework/support/env"
 	redisclient "github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	configmock "github.com/goravel/framework/mocks/config"
-	testingdocker "github.com/goravel/framework/support/docker"
-	"github.com/goravel/framework/support/env"
-	"github.com/spf13/cast"
 )
 
 const (
@@ -28,9 +27,14 @@ const (
 type SessionTestSuite struct {
 	suite.Suite
 	Session        *Session
-	docker         *testingdocker.Redis
-	mockConfig     *configmock.Config
+	mockConfig     *mocksconfig.Config
 	rawRedisClient *redisclient.Client
+}
+
+// BeforeTest runs before each test in the suite.
+func (s *SessionTestSuite) SetupTest() {
+	err := s.rawRedisClient.FlushDB(context.Background()).Err()
+	s.Require().NoError(err, "Failed to flush Redis DB before test")
 }
 
 // TestSessionTestSuite runs the test suite
@@ -39,25 +43,26 @@ func TestSessionTestSuite(t *testing.T) {
 		t.Skip("Skipping Redis session tests using Docker on Windows")
 	}
 
-	redisDocker := testingdocker.NewRedis()
+	redisDocker := docker.NewRedis()
 	if err := redisDocker.Build(); err != nil {
 		t.Fatalf("Failed to build Redis Docker container: %v", err)
 	}
 	t.Logf("Redis Docker container running on port %d", redisDocker.Config().Port)
 
-	mockConfig := configmock.NewConfig(t)
+	mockConfig := mocksconfig.NewConfig(t)
 	dockerPortStr := cast.ToString(redisDocker.Config().Port)
 
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testRedisConnection)).Return("localhost").Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", testRedisConnection), "6379").Return(dockerPortStr).Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testRedisConnection)).Return("").Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testRedisConnection)).Return("").Once()
-	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testRedisConnection), 0).Return(0).Once()
-	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", testRedisConnection)).Return(nil).Once()
-	mockConfig.On("GetInt", "session.lifetime", 120).Return(testSessionLifetime).Once()
-	mockConfig.On("GetString", "session.cookie", "goravel_session").Return(testSessionCookie).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("session.drivers.%s.connection", testRedisDriverName), "default").Return(testRedisConnection).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testRedisConnection)).Return("localhost").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testRedisConnection), "6379").Return(dockerPortStr).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testRedisConnection), 0).Return(0).Once()
+	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testRedisConnection)).Return(nil).Once()
+	mockConfig.EXPECT().GetInt("session.lifetime", 120).Return(testSessionLifetime).Once()
+	mockConfig.EXPECT().GetString("session.cookie", "goravel_session").Return(testSessionCookie).Once()
 
-	SessionDriver, err := NewSession(context.Background(), mockConfig, testRedisConnection)
+	SessionDriver, err := NewSession(context.Background(), mockConfig, testRedisDriverName)
 	require.NoError(t, err, "NewRedis should succeed")
 	require.NotNil(t, SessionDriver, "NewRedis result should not be nil")
 
@@ -70,20 +75,11 @@ func TestSessionTestSuite(t *testing.T) {
 
 	suite.Run(t, &SessionTestSuite{
 		Session:        SessionDriver,
-		docker:         redisDocker,
 		mockConfig:     mockConfig,
 		rawRedisClient: rawClient,
 	})
 
-	require.NoError(t, SessionDriver.Close(), "Failed to close session driver")
-	require.NoError(t, rawClient.Close(), "Failed to close raw redis client")
 	require.NoError(t, redisDocker.Shutdown(), "Failed to shutdown Redis Docker container")
-}
-
-// BeforeTest runs before each test in the suite.
-func (s *SessionTestSuite) BeforeTest(suiteName, testName string) {
-	err := s.rawRedisClient.FlushDB(context.Background()).Err()
-	s.Require().NoError(err, "Failed to flush Redis DB before test %s/%s", suiteName, testName)
 }
 
 func (s *SessionTestSuite) TestWrite() {
@@ -192,28 +188,6 @@ func (s *SessionTestSuite) TestGc() {
 func (s *SessionTestSuite) TestOpen() {
 	err := s.Session.Open("", "")
 	s.Nil(err, "Open should be a no-op and return nil error")
-}
-
-// TestClose is implicitly tested by the suite runner teardown which calls Close.
-// We can add an explicit simple call check here too.
-func (s *SessionTestSuite) TestClose() {
-	mockConfig := configmock.NewConfig(s.T())
-	dockerPortStr := cast.ToString(s.docker.Config().Port)
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testRedisConnection)).Return("localhost").Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", testRedisConnection), "6379").Return(dockerPortStr).Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testRedisConnection)).Return("").Once()
-	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testRedisConnection)).Return("").Once()
-	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testRedisConnection), 0).Return(0).Once()
-	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", testRedisConnection)).Return(nil).Once()
-	mockConfig.On("GetInt", "session.lifetime", 120).Return(testSessionLifetime).Once()
-	mockConfig.On("GetString", "session.cookie", "goravel_session").Return(testSessionCookie).Once()
-
-	tempDriver, err := NewSession(context.Background(), mockConfig, testRedisConnection)
-	s.Require().NoError(err)
-	s.Require().NotNil(tempDriver)
-
-	closeErr := tempDriver.Close()
-	s.Nil(closeErr, "Close should not return an error")
 }
 
 func (s *SessionTestSuite) TestPrefix() {

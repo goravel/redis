@@ -27,7 +27,7 @@ func (receiver *ServiceProvider) Register(app foundation.Application) {
 		return NewQueue(context.Background(), app.MakeConfig(), app.MakeQueue(), parameters["connection"].(string))
 	})
 	app.BindWith(SessionBinding, func(app foundation.Application, parameters map[string]any) (any, error) {
-		return NewSession(context.Background(), app.MakeConfig(), parameters["connection"].(string))
+		return NewSession(context.Background(), app.MakeConfig(), parameters["driver"].(string))
 	})
 }
 
