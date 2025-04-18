@@ -48,7 +48,7 @@ func (s *QueueTestSuite) SetupSuite() {
 	mockQueue := mocksqueue.NewQueue(s.T())
 	s.mockQueue = mockQueue
 
-	queue, err := NewQueue(context.Background(), mockConfig, mockQueue, json.NewJson(), "redis")
+	queue, err := NewQueue(context.Background(), mockConfig, mockQueue, json.New(), "redis")
 	s.Nil(err)
 	s.queue = queue
 }
@@ -81,15 +81,15 @@ func (s *QueueTestSuite) TestPush() {
 	s.Run("no delay", func() {
 		queueKey := "no-delay"
 		task := queue.Task{
-			Uuid: "865111de-ff50-4652-9733-72fea655f836",
+			UUID: "865111de-ff50-4652-9733-72fea655f836",
 			Jobs: queue.Jobs{
 				Job:  &MockJob{},
-				Args: mockArgs,
+				Args: testArgs,
 			},
 			Chain: []queue.Jobs{
 				{
 					Job:   &MockJob{},
-					Args:  mockArgs,
+					Args:  testArgs,
 					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
@@ -109,16 +109,16 @@ func (s *QueueTestSuite) TestPush() {
 	s.Run("delay", func() {
 		queueKey := "delay"
 		task := queue.Task{
-			Uuid: "865111de-ff50-4652-9733-72fea655f836",
+			UUID: "865111de-ff50-4652-9733-72fea655f836",
 			Jobs: queue.Jobs{
 				Job:   &MockJob{},
-				Args:  mockArgs,
+				Args:  testArgs,
 				Delay: time.Now().Add(2 * time.Second),
 			},
 			Chain: []queue.Jobs{
 				{
 					Job:   &MockJob{},
-					Args:  mockArgs,
+					Args:  testArgs,
 					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
@@ -147,15 +147,15 @@ func (s *QueueTestSuite) TestPop() {
 	s.Run("success", func() {
 		queueKey := "pop"
 		task := queue.Task{
-			Uuid: "865111de-ff50-4652-9733-72fea655f836",
+			UUID: "865111de-ff50-4652-9733-72fea655f836",
 			Jobs: queue.Jobs{
 				Job:  &MockJob{},
-				Args: mockArgs,
+				Args: testArgs,
 			},
 			Chain: []queue.Jobs{
 				{
 					Job:   &MockJob{},
-					Args:  mockArgs,
+					Args:  testArgs,
 					Delay: time.Now().Add(1 * time.Hour),
 				},
 			},
@@ -192,15 +192,15 @@ func (s *QueueTestSuite) TestPop() {
 func (s *QueueTestSuite) TestLater() {
 	queueKey := "later"
 	task := queue.Task{
-		Uuid: "865111de-ff50-4652-9733-72fea655f836",
+		UUID: "865111de-ff50-4652-9733-72fea655f836",
 		Jobs: queue.Jobs{
 			Job:  &MockJob{},
-			Args: mockArgs,
+			Args: testArgs,
 		},
 		Chain: []queue.Jobs{
 			{
 				Job:   &MockJob{},
-				Args:  mockArgs,
+				Args:  testArgs,
 				Delay: time.Now().Add(1 * time.Hour),
 			},
 		},
@@ -257,42 +257,118 @@ func (s *QueueTestSuite) TestMigrateDelayedJobs() {
 }
 
 var (
-	mockArgs = []queue.Arg{
+	testArgs = []queue.Arg{
 		{
-			Type:  "string",
-			Value: "value",
-		},
-		{
-			Type:  "uint",
-			Value: uint(1),
+			Type:  "bool",
+			Value: true,
 		},
 		{
 			Type:  "int",
 			Value: 1,
 		},
 		{
-			Type:  "bool",
-			Value: true,
+			Type:  "int8",
+			Value: int8(1),
+		},
+		{
+			Type:  "int16",
+			Value: int16(1),
+		},
+		{
+			Type:  "int32",
+			Value: int32(1),
+		},
+		{
+			Type:  "int64",
+			Value: int64(1),
+		},
+		{
+			Type:  "uint",
+			Value: uint(1),
+		},
+		{
+			Type:  "uint8",
+			Value: uint8(1),
+		},
+		{
+			Type:  "uint16",
+			Value: uint16(1),
+		},
+		{
+			Type:  "uint32",
+			Value: uint32(1),
+		},
+		{
+			Type:  "uint64",
+			Value: uint64(1),
 		},
 		{
 			Type:  "float32",
 			Value: float32(1.1),
 		},
 		{
-			Type:  "[]string",
-			Value: []string{"a", "b", "c"},
+			Type:  "float64",
+			Value: float64(1.2),
+		},
+		{
+			Type:  "string",
+			Value: "test",
+		},
+		{
+			Type:  "[]bool",
+			Value: []bool{true, false},
 		},
 		{
 			Type:  "[]int",
 			Value: []int{1, 2, 3},
 		},
 		{
-			Type:  "[]float32",
-			Value: []float32{1.1, 2.2, 3.3},
+			Type:  "[]int8",
+			Value: []int8{1, 2, 3},
 		},
 		{
-			Type:  "[]bool",
-			Value: []bool{true, false, true},
+			Type:  "[]int16",
+			Value: []int16{1, 2, 3},
+		},
+		{
+			Type:  "[]int32",
+			Value: []int32{1, 2, 3},
+		},
+		{
+			Type:  "[]int64",
+			Value: []int64{1, 2, 3},
+		},
+		{
+			Type:  "[]uint",
+			Value: []uint{1, 2, 3},
+		},
+		{
+			Type:  "[]uint8",
+			Value: []uint8{1, 2, 3},
+		},
+		{
+			Type:  "[]uint16",
+			Value: []uint16{1, 2, 3},
+		},
+		{
+			Type:  "[]uint32",
+			Value: []uint32{1, 2, 3},
+		},
+		{
+			Type:  "[]uint64",
+			Value: []uint64{1, 2, 3},
+		},
+		{
+			Type:  "[]float32",
+			Value: []float32{1.1, 1.2, 1.3},
+		},
+		{
+			Type:  "[]float64",
+			Value: []float64{1.1, 1.2, 1.3},
+		},
+		{
+			Type:  "[]string",
+			Value: []string{"test", "test2", "test3"},
 		},
 	}
 )
