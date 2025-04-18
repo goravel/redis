@@ -156,7 +156,7 @@ func (r *Queue) taskToJson(task contractsqueue.Task) ([]byte, error) {
 	}
 
 	t := Task{
-		Uuid:  task.Uuid,
+		Uuid:  task.UUID,
 		Job:   job,
 		Chain: chain,
 	}
@@ -209,7 +209,7 @@ func (r *Queue) jsonToTask(payload string) (contractsqueue.Task, error) {
 	}
 
 	return contractsqueue.Task{
-		Uuid:  task.Uuid,
+		UUID:  task.Uuid,
 		Jobs:  jobs,
 		Chain: chain,
 	}, nil
