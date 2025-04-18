@@ -4,11 +4,14 @@ import (
 	"context"
 
 	"github.com/goravel/framework/contracts/foundation"
+	"github.com/goravel/framework/errors"
 )
 
 const (
 	CacheBinding = "goravel.redis.cache"
 	QueueBinding = "goravel.redis.queue"
+
+	Name = "redis"
 )
 
 var App foundation.Application
@@ -20,10 +23,26 @@ func (receiver *ServiceProvider) Register(app foundation.Application) {
 	App = app
 
 	app.BindWith(CacheBinding, func(app foundation.Application, parameters map[string]any) (any, error) {
-		return NewCache(context.Background(), app.MakeConfig(), parameters["store"].(string))
+		config := app.MakeConfig()
+		if config == nil {
+			return nil, errors.ConfigFacadeNotSet.SetModule(errors.ModuleCache)
+		}
+
+		return NewCache(context.Background(), config, parameters["store"].(string))
 	})
+
 	app.BindWith(QueueBinding, func(app foundation.Application, parameters map[string]any) (any, error) {
-		return NewQueue(context.Background(), app.MakeConfig(), app.MakeQueue(), parameters["connection"].(string))
+		config := app.MakeConfig()
+		if config == nil {
+			return nil, errors.ConfigFacadeNotSet.SetModule(errors.ModuleQueue)
+		}
+
+		queue := app.MakeQueue()
+		if queue == nil {
+			return nil, errors.QueueFacadeNotSet.SetModule(errors.ModuleQueue)
+		}
+
+		return NewQueue(context.Background(), config, queue, app.GetJson(), parameters["connection"].(string))
 	})
 }
 
