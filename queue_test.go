@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,23 +13,24 @@ import (
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
 var (
-	testRedisJob       = 0
-	testDelayRedisJob  = 0
-	testCustomRedisJob = 0
-	testErrorRedisJob  = 0
-	testChainRedisJob  = 0
+	testRedisJob             = 0
+	testDelayRedisJob        = 0
+	testCustomRedisJob       = 0
+	testErrorRedisJob        = 0
+	testChainRedisJob        = 0
+	testQueueRedisConnection = "queue-default"
 )
 
 type QueueTestSuite struct {
 	suite.Suite
-	app        *queue.Application
-	mockConfig *mocksconfig.Config
-	redis      *Queue
+	app         *queue.Application
+	mockConfig  *mocksconfig.Config
+	redis       *Queue
+	redisDocker *docker.Redis
 }
 
 func TestQueueTestSuite(t *testing.T) {
@@ -40,13 +42,13 @@ func TestQueueTestSuite(t *testing.T) {
 	assert.Nil(t, redisDocker.Build())
 
 	mockConfig := mocksconfig.NewConfig(t)
-	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("default").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.default.database", 0).Return(0).Once()
-	mockConfig.EXPECT().Get("database.redis.default.tls").Return(nil).Once()
+	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return(testQueueRedisConnection).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testQueueRedisConnection)).Return("localhost").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testQueueRedisConnection), "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testQueueRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testQueueRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testQueueRedisConnection), 0).Return(0).Once()
+	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testQueueRedisConnection)).Return(nil).Once()
 	app := queue.NewApplication(mockConfig)
 	app.Register([]contractsqueue.Job{&TestRedisJob{}, &TestDelayRedisJob{}, &TestCustomRedisJob{}, &TestErrorRedisJob{}, &TestChainRedisJob{}})
 
@@ -54,12 +56,15 @@ func TestQueueTestSuite(t *testing.T) {
 	assert.Nil(t, err)
 
 	suite.Run(t, &QueueTestSuite{
-		app:        app,
-		mockConfig: mockConfig,
-		redis:      redis,
+		app:         app,
+		mockConfig:  mockConfig,
+		redisDocker: redisDocker,
+		redis:       redis,
 	})
+}
 
-	require.NoError(t, redisDocker.Shutdown(), "Failed to shutdown Redis Docker container")
+func (s *QueueTestSuite) TearDownAllSuite() {
+	assert.Nil(s.T(), s.redisDocker.Shutdown())
 }
 
 func (s *QueueTestSuite) SetupTest() {

@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	testSessionLifetime = 2
-	testSessionCookie   = "goravel_session_test_redis"
-	testRedisDriverName = "redis"
-	testRedisConnection = "default"
-	testPrefix          = testSessionCookie + ":"
-	testSessionFiles    = ""
+	testSessionLifetime        = 2
+	testSessionCookie          = "goravel_session_test_redis"
+	testRedisDriverName        = "redis"
+	testSessionRedisConnection = "session-default"
+	testPrefix                 = testSessionCookie + ":"
+	testSessionFiles           = ""
 )
 
 type SessionTestSuite struct {
@@ -52,13 +52,13 @@ func TestSessionTestSuite(t *testing.T) {
 	mockConfig := mocksconfig.NewConfig(t)
 	dockerPortStr := cast.ToString(redisDocker.Config().Port)
 
-	mockConfig.EXPECT().GetString(fmt.Sprintf("session.drivers.%s.connection", testRedisDriverName), "default").Return(testRedisConnection).Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testRedisConnection)).Return("localhost").Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testRedisConnection), "6379").Return(dockerPortStr).Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testRedisConnection)).Return("").Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testRedisConnection)).Return("").Once()
-	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testRedisConnection), 0).Return(0).Once()
-	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testRedisConnection)).Return(nil).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("session.drivers.%s.connection", testRedisDriverName), "default").Return(testSessionRedisConnection).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testSessionRedisConnection)).Return("localhost").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testSessionRedisConnection), "6379").Return(dockerPortStr).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testSessionRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testSessionRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testSessionRedisConnection), 0).Return(0).Once()
+	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testSessionRedisConnection)).Return(nil).Once()
 	mockConfig.EXPECT().GetInt("session.lifetime", 120).Return(testSessionLifetime).Once()
 	mockConfig.EXPECT().GetString("session.cookie", "goravel_session").Return(testSessionCookie).Once()
 
@@ -79,7 +79,7 @@ func TestSessionTestSuite(t *testing.T) {
 		rawRedisClient: rawClient,
 	})
 
-	require.NoError(t, redisDocker.Shutdown(), "Failed to shutdown Redis Docker container")
+	// require.NoError(t, redisDocker.Shutdown(), "Failed to shutdown Redis Docker container")
 }
 
 func (s *SessionTestSuite) TestWrite() {
