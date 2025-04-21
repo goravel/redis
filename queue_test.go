@@ -141,7 +141,7 @@ func (s *QueueTestSuite) TestPop() {
 		queueKey := "no-job"
 		task, err := s.queue.Pop(queueKey)
 		s.Equal(errors.QueueDriverNoJobFound.Args(queueKey), err)
-		s.Nil(task)
+		s.Equal(queue.Task{}, task)
 	})
 
 	s.Run("success", func() {
@@ -194,8 +194,9 @@ func (s *QueueTestSuite) TestLater() {
 	task := queue.Task{
 		UUID: "865111de-ff50-4652-9733-72fea655f836",
 		Jobs: queue.Jobs{
-			Job:  &MockJob{},
-			Args: testArgs,
+			Job:   &MockJob{},
+			Args:  testArgs,
+			Delay: time.Now().Add(1 * time.Second),
 		},
 		Chain: []queue.Jobs{
 			{
@@ -219,9 +220,9 @@ func (s *QueueTestSuite) TestLater() {
 	task1, err := s.queue.Pop(queueKey)
 
 	s.Equal(errors.QueueDriverNoJobFound.Args(queueKey), err)
-	s.Nil(task1)
+	s.Equal(queue.Task{}, task1)
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	s.mockQueue.EXPECT().GetJob(task.Job.Signature()).Return(&MockJob{}, nil).Twice()
 	task1, err = s.queue.Pop(queueKey)
