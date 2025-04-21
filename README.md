@@ -1,14 +1,14 @@
 # Redis
 
-A redis driver for `facades.Cache()` and `facades.Queue()` of Goravel.
+A redis driver for `facades.Cache()`, `facades.Queue()` and `facades.Session()` of Goravel.
 
 ## Version
 
-| goravel/redis  | goravel/framework    |
-| ----------     | --------------       |
-| v1.2.*         | v1.14.*              |
-| v1.1.*         | v1.13.*              |
-| v1.0.*         | v1.12.*              |
+| goravel/redis | goravel/framework |
+| ------------- | ----------------- |
+| v1.2.*       | v1.14.*          |
+| v1.1.*       | v1.13.*          |
+| v1.0.*       | v1.12.*          |
 
 ## Install
 
@@ -31,6 +31,7 @@ import "github.com/goravel/redis"
    // Exists in the config/app.go file, DO NOT copy this line
     &cache.ServiceProvider{},
     &queue.ServiceProvider{},
+    &session.ServiceProvider{},
     ...
 }
 ```
@@ -76,7 +77,27 @@ import (
 },
 ```
 
-5. Fill redis configuration to `config/database.go` file
+5. Add your redis configuration to `config/session.go` file if you want to use redis as session driver
+
+```
+import (
+    "github.com/goravel/framework/contracts/session"
+    redisfacades "github.com/goravel/redis/facades"
+)
+
+"drivers": map[string]any{
+    ...
+    "redis": map[string]any{
+        "driver": "custom",
+        "connection": "default",
+        "via": func() (session.Driver, error) {
+            return redisfacades.Session("redis")
+        },
+    },
+},
+```
+
+6. Fill redis configuration to `config/database.go` file
 
 ```
 // config/database.go

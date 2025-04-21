@@ -9,10 +9,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/queue"
 	frameworkerrors "github.com/goravel/framework/errors"
-	"github.com/redis/go-redis/v9"
+
+	supportredis "github.com/goravel/redis/support/redis"
 )
 
 func init() {
@@ -36,20 +39,10 @@ type Queue struct {
 
 func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, connection string) (*Queue, error) {
 	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
-	host := config.GetString(fmt.Sprintf("database.redis.%s.host", connection))
-	if host == "" {
-		return nil, fmt.Errorf("redis host is not configured for connection %s", connection)
-	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, config.GetString(fmt.Sprintf("database.redis.%s.port", connection))),
-		Username: config.GetString(fmt.Sprintf("database.redis.%s.username", connection)),
-		Password: config.GetString(fmt.Sprintf("database.redis.%s.password", connection)),
-		DB:       config.GetInt(fmt.Sprintf("database.redis.%s.database", connection)),
-	})
-
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, err
+	client, err := supportredis.GetClient(config, connection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}
 
 	return &Queue{

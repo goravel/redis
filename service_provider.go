@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	CacheBinding = "goravel.redis.cache"
-	QueueBinding = "goravel.redis.queue"
+	CacheBinding   = "goravel.redis.cache"
+	QueueBinding   = "goravel.redis.queue"
+	SessionBinding = "goravel.redis.session"
 )
 
 var App foundation.Application
@@ -24,6 +25,9 @@ func (receiver *ServiceProvider) Register(app foundation.Application) {
 	})
 	app.BindWith(QueueBinding, func(app foundation.Application, parameters map[string]any) (any, error) {
 		return NewQueue(context.Background(), app.MakeConfig(), app.MakeQueue(), parameters["connection"].(string))
+	})
+	app.BindWith(SessionBinding, func(app foundation.Application, parameters map[string]any) (any, error) {
+		return NewSession(context.Background(), app.MakeConfig(), parameters["driver"].(string))
 	})
 }
 

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+)
+
+var (
+	testCacheRedisConnection = "cache-default"
 )
 
 type CacheTestSuite struct {
@@ -30,13 +35,13 @@ func TestCacheTestSuite(t *testing.T) {
 	assert.Nil(t, redisDocker.Build())
 
 	mockConfig := &mocksconfig.Config{}
-	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return("default").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
-	mockConfig.EXPECT().Get("database.redis.default.tls").Return(nil).Once()
+	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return(testCacheRedisConnection).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testCacheRedisConnection)).Return("localhost").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testCacheRedisConnection), "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testCacheRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testCacheRedisConnection)).Return("").Once()
+	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testCacheRedisConnection), 0).Return(0).Once()
+	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testCacheRedisConnection)).Return(nil).Once()
 	mockConfig.EXPECT().GetString("cache.prefix").Return("goravel_cache").Once()
 	store, err := NewCache(context.Background(), mockConfig, "redis")
 	require.NoError(t, err)
