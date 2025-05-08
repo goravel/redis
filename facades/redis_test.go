@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/goravel/framework/foundation/json"
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	mocksfoundation "github.com/goravel/framework/mocks/foundation"
 	mocksqueue "github.com/goravel/framework/mocks/queue"
@@ -126,7 +127,7 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 
 	queue := mocksqueue.NewQueue(t)
 
-	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, queue, connectionName)
+	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, queue, json.New(), connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return

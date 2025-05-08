@@ -38,12 +38,13 @@ func (s *QueueTestSuite) SetupSuite() {
 	s.redisDocker = redisDocker
 
 	mockConfig := mocksconfig.NewConfig(s.T())
-	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("default").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.port").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.default.database").Return(0).Once()
+	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("queue-default").Once()
+	mockConfig.EXPECT().GetString("database.redis.queue-default.host").Return("localhost").Once()
+	mockConfig.EXPECT().GetString("database.redis.queue-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.queue-default.username").Return("").Once()
+	mockConfig.EXPECT().GetString("database.redis.queue-default.password").Return("").Once()
+	mockConfig.EXPECT().GetInt("database.redis.queue-default.database", 0).Return(0).Once()
+	mockConfig.EXPECT().Get("database.redis.queue-default.tls").Return(nil).Once()
 
 	mockQueue := mocksqueue.NewQueue(s.T())
 	s.mockQueue = mockQueue
@@ -54,7 +55,7 @@ func (s *QueueTestSuite) SetupSuite() {
 }
 
 func (s *QueueTestSuite) TearDownSuite() {
-	s.Nil(s.redisDocker.Shutdown())
+	s.NoError(s.redisDocker.Shutdown())
 }
 
 func (s *QueueTestSuite) SetupTest() {
@@ -62,7 +63,7 @@ func (s *QueueTestSuite) SetupTest() {
 }
 
 func (s *QueueTestSuite) TestConnection() {
-	s.Equal("default", s.queue.Connection())
+	s.Equal("queue-default", s.queue.Connection())
 }
 
 func (s *QueueTestSuite) TestDelayQueueKey() {
