@@ -1,43 +1,44 @@
 package redis
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/goravel/framework/contracts/config"
-	"github.com/goravel/framework/contracts/queue"
-	frameworkerrors "github.com/goravel/framework/errors"
+	"github.com/goravel/framework/contracts/foundation"
+	contractsqueue "github.com/goravel/framework/contracts/queue"
+	"github.com/goravel/framework/errors"
+	"github.com/goravel/framework/queue"
+	"github.com/redis/go-redis/v9"
 
 	supportredis "github.com/goravel/redis/support/redis"
 )
 
-func init() {
-	gob.Register(queueData{})
+type Task struct {
+	Job
+	Uuid  string `json:"uuid"`
+	Chain []Job  `json:"chain"`
 }
 
-type queueData struct {
-	Signature string `json:"signature"`
-	Args      []any  `json:"args"`
-	Attempts  uint   `json:"attempts"`
+type Job struct {
+	Signature string               `json:"signature"`
+	Args      []contractsqueue.Arg `json:"args"`
+	Delay     *time.Time           `json:"delay"`
 }
 
-var _ queue.Driver = &Queue{}
+var _ contractsqueue.Driver = &Queue{}
 
 type Queue struct {
-	ctx        context.Context
-	queue      queue.Queue
-	instance   *redis.Client
 	connection string
+	ctx        context.Context
+	json       foundation.Json
+	queue      contractsqueue.Queue
+	instance   *redis.Client
 }
 
-func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, connection string) (*Queue, error) {
+func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, json foundation.Json, connection string) (*Queue, error) {
 	connection = config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
 
 	client, err := supportredis.GetClient(config, connection)
@@ -46,35 +47,12 @@ func NewQueue(ctx context.Context, config config.Config, queue queue.Queue, conn
 	}
 
 	return &Queue{
+		connection: connection,
 		ctx:        ctx,
+		json:       json,
 		queue:      queue,
 		instance:   client,
-		connection: connection,
 	}, nil
-}
-
-func (r *Queue) Bulk(jobs []queue.Jobs, queue string) error {
-	pipe := r.instance.Pipeline()
-	now := time.Now()
-
-	for _, job := range jobs {
-		payload, err := r.jobToGob(job.Job.Signature(), job.Args)
-		if err != nil {
-			return err
-		}
-
-		if job.Delay.After(now) {
-			pipe.ZAdd(r.ctx, queue+":delayed", redis.Z{
-				Score:  float64(job.Delay.Unix()),
-				Member: payload,
-			})
-		} else {
-			pipe.RPush(r.ctx, queue, payload)
-		}
-	}
-
-	_, err := pipe.Exec(r.ctx)
-	return err
 }
 
 func (r *Queue) Connection() string {
@@ -82,57 +60,64 @@ func (r *Queue) Connection() string {
 }
 
 func (r *Queue) Driver() string {
-	return queue.DriverCustom
+	return contractsqueue.DriverCustom
 }
 
-func (r *Queue) Pop(queue string) (queue.Job, []any, error) {
-	if err := r.migrateDelayedJobs(queue); err != nil {
-		return nil, nil, err
-	}
-
-	result, err := r.instance.LPop(r.ctx, queue).Bytes()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, nil, frameworkerrors.QueueDriverNoJobFound.Args(queue)
-		}
-		return nil, nil, err
-	}
-
-	signature, args, err := r.gobToJob(result)
-	if err != nil {
-		return nil, nil, err
-	}
-	job, err := r.queue.GetJob(signature)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return job, args, nil
+func (r *Queue) Instance() *redis.Client {
+	return r.instance
 }
 
-func (r *Queue) Push(job queue.Job, args []any, queue string) error {
-	payload, err := r.jobToGob(job.Signature(), args)
+func (r *Queue) Later(delay time.Time, task contractsqueue.Task, queueKey string) error {
+	payload, err := queue.TaskToJson(task, r.json)
 	if err != nil {
 		return err
 	}
 
-	return r.instance.RPush(r.ctx, queue, payload).Err()
-}
-
-func (r *Queue) Later(delay time.Time, job queue.Job, args []any, queue string) error {
-	payload, err := r.jobToGob(job.Signature(), args)
-	if err != nil {
-		return err
-	}
-
-	return r.instance.ZAdd(r.ctx, queue+":delayed", redis.Z{
+	return r.instance.ZAdd(r.ctx, r.delayQueueKey(queueKey), redis.Z{
 		Score:  float64(delay.Unix()),
 		Member: payload,
 	}).Err()
 }
 
+func (r *Queue) Name() string {
+	return Name
+}
+
+func (r *Queue) Pop(queueKey string) (contractsqueue.Task, error) {
+	if err := r.migrateDelayedJobs(queueKey); err != nil {
+		return contractsqueue.Task{}, err
+	}
+
+	result, err := r.instance.LPop(r.ctx, queueKey).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return contractsqueue.Task{}, errors.QueueDriverNoJobFound.Args(queueKey)
+		}
+		return contractsqueue.Task{}, err
+	}
+
+	return queue.JsonToTask(result, r.queue, r.json)
+}
+
+func (r *Queue) Push(task contractsqueue.Task, queueKey string) error {
+	if !task.Delay.IsZero() {
+		return r.Later(task.Delay, task, queueKey)
+	}
+
+	payload, err := queue.TaskToJson(task, r.json)
+	if err != nil {
+		return err
+	}
+
+	return r.instance.RPush(r.ctx, queueKey, payload).Err()
+}
+
+func (r *Queue) delayQueueKey(queue string) string {
+	return fmt.Sprintf("%s:delayed", queue)
+}
+
 func (r *Queue) migrateDelayedJobs(queue string) error {
-	jobs, err := r.instance.ZRangeByScoreWithScores(r.ctx, queue+":delayed", &redis.ZRangeBy{
+	jobs, err := r.instance.ZRangeByScoreWithScores(r.ctx, r.delayQueueKey(queue), &redis.ZRangeBy{
 		Min:    "-inf",
 		Max:    strconv.FormatFloat(float64(time.Now().Unix()), 'f', -1, 64),
 		Offset: 0,
@@ -145,7 +130,7 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 	pipe := r.instance.TxPipeline()
 	for _, job := range jobs {
 		pipe.RPush(r.ctx, queue, job.Member)
-		pipe.ZRem(r.ctx, queue+":delayed", job.Member)
+		pipe.ZRem(r.ctx, r.delayQueueKey(queue), job.Member)
 	}
 	_, err = pipe.Exec(r.ctx)
 	if err != nil {
@@ -153,29 +138,4 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 	}
 
 	return nil
-}
-
-// jobToGob convert signature and args to Gob
-func (r *Queue) jobToGob(signature string, args []any) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	if err := enc.Encode(&queueData{
-		Signature: signature,
-		Args:      args,
-		Attempts:  0,
-	}); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-// gobToJob convert Gob to signature and args
-func (r *Queue) gobToJob(src []byte) (string, []any, error) {
-	dst := new(queueData)
-	dec := gob.NewDecoder(bytes.NewBuffer(src))
-	if err := dec.Decode(dst); err != nil {
-		return "", nil, err
-	}
-
-	return dst.Signature, dst.Args, nil
 }
