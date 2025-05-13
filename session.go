@@ -25,7 +25,7 @@ type Session struct {
 	lifetimeSeconds int
 }
 
-// NewRedis creates a new Redis session driver using Goravel's configuration.
+// NewSession creates a new Redis session driver using Goravel's configuration.
 func NewSession(ctx context.Context, config config.Config, driver string) (*Session, error) {
 
 	connection := config.GetString(fmt.Sprintf("session.drivers.%s.connection", driver), "default")
