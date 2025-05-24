@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/goravel/framework/contracts/queue"
+	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
 	"github.com/goravel/framework/foundation/json"
 	mocksconfig "github.com/goravel/framework/mocks/config"
@@ -38,6 +38,7 @@ func (s *QueueTestSuite) SetupSuite() {
 	s.redisDocker = redisDocker
 
 	mockConfig := mocksconfig.NewConfig(s.T())
+	mockConfig.EXPECT().GetString("app.name", "goravel").Return("test").Once()
 	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("queue-default").Once()
 	mockConfig.EXPECT().GetString("database.redis.queue-default.host").Return("localhost").Once()
 	mockConfig.EXPECT().GetString("database.redis.queue-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
@@ -62,32 +63,29 @@ func (s *QueueTestSuite) SetupTest() {
 
 }
 
-func (s *QueueTestSuite) TestConnection() {
-	s.Equal("queue-default", s.queue.Connection())
+func (s *QueueTestSuite) TestQueueKey() {
+	s.Equal("test_queues:redis_test-queue", s.queue.queueKey("test-queue"))
 }
 
 func (s *QueueTestSuite) TestDelayQueueKey() {
-	s.Equal("test-queue:delayed", s.queue.delayQueueKey("test-queue"))
+	s.Equal("test_queues:redis_test-queue:delayed", s.queue.delayQueueKey("test-queue"))
 }
 
 func (s *QueueTestSuite) TestDriver() {
 	s.Equal("custom", s.queue.Driver())
 }
 
-func (s *QueueTestSuite) TestName() {
-	s.Equal("redis", s.queue.Name())
-}
-
 func (s *QueueTestSuite) TestPush() {
 	s.Run("no delay", func() {
-		queueKey := "no-delay"
-		task := queue.Task{
+		queue := "no-delay"
+		queueKey := s.queue.queueKey(queue)
+		task := contractsqueue.Task{
 			UUID: "865111de-ff50-4652-9733-72fea655f836",
-			Jobs: queue.Jobs{
+			Jobs: contractsqueue.Jobs{
 				Job:  &MockJob{},
 				Args: testArgs,
 			},
-			Chain: []queue.Jobs{
+			Chain: []contractsqueue.Jobs{
 				{
 					Job:   &MockJob{},
 					Args:  testArgs,
@@ -96,7 +94,7 @@ func (s *QueueTestSuite) TestPush() {
 			},
 		}
 
-		s.NoError(s.queue.Push(task, queueKey))
+		s.NoError(s.queue.Push(task, queue))
 
 		count, err := s.queue.instance.LLen(context.Background(), queueKey).Result()
 		s.NoError(err)
@@ -108,15 +106,16 @@ func (s *QueueTestSuite) TestPush() {
 	})
 
 	s.Run("delay", func() {
-		queueKey := "delay"
-		task := queue.Task{
+		queue := "delay"
+		queueKey := s.queue.queueKey(queue)
+		task := contractsqueue.Task{
 			UUID: "865111de-ff50-4652-9733-72fea655f836",
-			Jobs: queue.Jobs{
+			Jobs: contractsqueue.Jobs{
 				Job:   &MockJob{},
 				Args:  testArgs,
 				Delay: time.Now().Add(2 * time.Second),
 			},
-			Chain: []queue.Jobs{
+			Chain: []contractsqueue.Jobs{
 				{
 					Job:   &MockJob{},
 					Args:  testArgs,
@@ -125,13 +124,13 @@ func (s *QueueTestSuite) TestPush() {
 			},
 		}
 
-		s.NoError(s.queue.Push(task, queueKey))
+		s.NoError(s.queue.Push(task, queue))
 
 		count, err := s.queue.instance.LLen(context.Background(), queueKey).Result()
 		s.NoError(err)
 		s.Equal(int64(0), count)
 
-		count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queueKey), "-inf", "+inf").Result()
+		count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queue), "-inf", "+inf").Result()
 		s.NoError(err)
 		s.Equal(int64(1), count)
 	})
@@ -139,21 +138,22 @@ func (s *QueueTestSuite) TestPush() {
 
 func (s *QueueTestSuite) TestPop() {
 	s.Run("no job", func() {
-		queueKey := "no-job"
-		task, err := s.queue.Pop(queueKey)
-		s.Equal(errors.QueueDriverNoJobFound.Args(queueKey), err)
-		s.Equal(queue.Task{}, task)
+		queue := "no-job"
+		task, err := s.queue.Pop(queue)
+		s.Equal(errors.QueueDriverNoJobFound.Args(s.queue.queueKey(queue)), err)
+		s.Equal(contractsqueue.Task{}, task)
 	})
 
 	s.Run("success", func() {
-		queueKey := "pop"
-		task := queue.Task{
+		queue := "pop"
+		queueKey := s.queue.queueKey(queue)
+		task := contractsqueue.Task{
 			UUID: "865111de-ff50-4652-9733-72fea655f836",
-			Jobs: queue.Jobs{
+			Jobs: contractsqueue.Jobs{
 				Job:  &MockJob{},
 				Args: testArgs,
 			},
-			Chain: []queue.Jobs{
+			Chain: []contractsqueue.Jobs{
 				{
 					Job:   &MockJob{},
 					Args:  testArgs,
@@ -162,10 +162,10 @@ func (s *QueueTestSuite) TestPop() {
 			},
 		}
 
-		s.NoError(s.queue.Push(task, queueKey))
+		s.NoError(s.queue.Push(task, queue))
 
 		s.mockQueue.EXPECT().GetJob(task.Job.Signature()).Return(&MockJob{}, nil).Twice()
-		task1, err := s.queue.Pop(queueKey)
+		task1, err := s.queue.Pop(queue)
 
 		s.NoError(err)
 		s.Equal(task.Job.Signature(), task1.Job.Signature())
@@ -191,15 +191,16 @@ func (s *QueueTestSuite) TestPop() {
 }
 
 func (s *QueueTestSuite) TestLater() {
-	queueKey := "later"
-	task := queue.Task{
+	queue := "later"
+	queueKey := s.queue.queueKey(queue)
+	task := contractsqueue.Task{
 		UUID: "865111de-ff50-4652-9733-72fea655f836",
-		Jobs: queue.Jobs{
+		Jobs: contractsqueue.Jobs{
 			Job:   &MockJob{},
 			Args:  testArgs,
 			Delay: time.Now().Add(1 * time.Second),
 		},
-		Chain: []queue.Jobs{
+		Chain: []contractsqueue.Jobs{
 			{
 				Job:   &MockJob{},
 				Args:  testArgs,
@@ -208,25 +209,25 @@ func (s *QueueTestSuite) TestLater() {
 		},
 	}
 
-	s.NoError(s.queue.Push(task, queueKey))
+	s.NoError(s.queue.Push(task, queue))
 
 	count, err := s.queue.instance.LLen(context.Background(), queueKey).Result()
 	s.NoError(err)
 	s.Equal(int64(0), count)
 
-	count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queueKey), "-inf", "+inf").Result()
+	count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queue), "-inf", "+inf").Result()
 	s.NoError(err)
 	s.Equal(int64(1), count)
 
-	task1, err := s.queue.Pop(queueKey)
+	task1, err := s.queue.Pop(queue)
 
 	s.Equal(errors.QueueDriverNoJobFound.Args(queueKey), err)
-	s.Equal(queue.Task{}, task1)
+	s.Equal(contractsqueue.Task{}, task1)
 
 	time.Sleep(1 * time.Second)
 
 	s.mockQueue.EXPECT().GetJob(task.Job.Signature()).Return(&MockJob{}, nil).Twice()
-	task1, err = s.queue.Pop(queueKey)
+	task1, err = s.queue.Pop(queue)
 	s.NoError(err)
 	s.NotNil(task1)
 	s.Equal(task.Job.Signature(), task1.Job.Signature())
@@ -235,16 +236,17 @@ func (s *QueueTestSuite) TestLater() {
 	s.NoError(err)
 	s.Equal(int64(0), count)
 
-	count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queueKey), "-inf", "+inf").Result()
+	count, err = s.queue.instance.ZCount(context.Background(), s.queue.delayQueueKey(queue), "-inf", "+inf").Result()
 	s.NoError(err)
 	s.Equal(int64(0), count)
 }
 
 func (s *QueueTestSuite) TestMigrateDelayedJobs() {
 	// Add a delayed job
+	queue := "test-queue"
 	delay := time.Now().Add(-1 * time.Hour) // Past time
 	payload := "test-payload"
-	s.queue.instance.ZAdd(context.Background(), s.queue.delayQueueKey("test-queue"), redis.Z{
+	s.queue.instance.ZAdd(context.Background(), s.queue.delayQueueKey(queue), redis.Z{
 		Score:  float64(delay.Unix()),
 		Member: payload,
 	})
@@ -253,13 +255,13 @@ func (s *QueueTestSuite) TestMigrateDelayedJobs() {
 	s.Nil(err)
 
 	// Verify the job was moved to the main queue
-	result, err := s.queue.instance.LPop(context.Background(), "test-queue").Result()
+	result, err := s.queue.instance.LPop(context.Background(), s.queue.queueKey(queue)).Result()
 	s.Nil(err)
 	s.Equal(payload, result)
 }
 
 var (
-	testArgs = []queue.Arg{
+	testArgs = []contractsqueue.Arg{
 		{
 			Type:  "bool",
 			Value: true,
