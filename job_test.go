@@ -45,14 +45,14 @@ func (s *ReservedJobTestSuite) SetupSuite() {
 	s.redisDocker = redisDocker
 
 	mockConfig := mocksconfig.NewConfig(s.T())
-	mockConfig.EXPECT().GetString("database.redis.queue-default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.queue-default.database", 0).Return(0).Once()
-	mockConfig.EXPECT().Get("database.redis.queue-default.tls").Return(nil).Once()
+	mockConfig.EXPECT().GetString("database.redis.job-default.host").Return("localhost").Once()
+	mockConfig.EXPECT().GetString("database.redis.job-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString("database.redis.job-default.username").Return("").Once()
+	mockConfig.EXPECT().GetString("database.redis.job-default.password").Return("").Once()
+	mockConfig.EXPECT().GetInt("database.redis.job-default.database", 0).Return(0).Once()
+	mockConfig.EXPECT().Get("database.redis.job-default.tls").Return(nil).Once()
 
-	client, err := supportredis.GetClient(mockConfig, "queue-default")
+	client, err := supportredis.GetClient(mockConfig, "job-default")
 	s.Nil(err)
 
 	s.ctx = context.Background()
