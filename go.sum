@@ -311,8 +311,8 @@ github.com/gookit/validate v1.5.4 h1:nwBo6vULnVUeNFCOde6RKFRbOCKJXVMnWR0ghedacLg
 github.com/gookit/validate v1.5.4/go.mod h1:p9sRPfpvYB4vXICBpEPzv8FoAky+XhUOhWQghgmmat4=
 github.com/goravel/file-rotatelogs/v2 v2.4.2 h1:g68AzbePXcm0V2CpUMc9j4qVzcDn7+7aoWSjZ51C0m4=
 github.com/goravel/file-rotatelogs/v2 v2.4.2/go.mod h1:23VuSW8cBS4ax5cmbV+5AaiLpq25b8UJ96IhbAkdo8I=
-github.com/goravel/framework v1.15.2-0.20250531021301-f6542cd81af9 h1:5oTr9D5nssJ3aMsIijQjom96S+7jWb0lObK5oA+fPOs=
-github.com/goravel/framework v1.15.2-0.20250531021301-f6542cd81af9/go.mod h1:1SMq/JF/FFnUNVLdAX4lpI/E/X0INa5eYylcb7oc/zg=
+github.com/goravel/framework v1.15.2-0.20250531080756-1d20e34c7d3b h1:pr2XN5FGOwXZLIMf0X2XRkDzyN6DzOeils/62zKYryk=
+github.com/goravel/framework v1.15.2-0.20250531080756-1d20e34c7d3b/go.mod h1:1SMq/JF/FFnUNVLdAX4lpI/E/X0INa5eYylcb7oc/zg=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
