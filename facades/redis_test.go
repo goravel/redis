@@ -104,14 +104,11 @@ func TestMakingCacheWithRealImplementation(t *testing.T) {
 
 func TestMakingQueueWithRealImplementation(t *testing.T) {
 
+	connectionName := "queue_default"
 	mockApp := mocksfoundation.NewApplication(t)
 	mockConfig := mocksconfig.NewConfig(t)
-	mockConfig.ExpectedCalls = nil
-
-	connectionName := "queue_default"
-
+	mockConfig.EXPECT().GetString("app.name", "goravel").Return("goravel").Once()
 	mockConfig.On("GetString", fmt.Sprintf("queue.connections.%s.connection", connectionName), "default").Return(connectionName).Once()
-
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connectionName)).Return("localhost").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", connectionName), "6379").Return("6379").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
@@ -125,9 +122,11 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 	}()
 	redis.App = mockApp
 
-	queue := mocksqueue.NewQueue(t)
+	mockQueue := mocksqueue.NewQueue(t)
+	mockJobStorer := mocksqueue.NewJobStorer(t)
+	mockQueue.EXPECT().GetJobStorer().Return(mockJobStorer)
 
-	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, queue, json.New(), connectionName)
+	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, mockQueue, json.New(), connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return
