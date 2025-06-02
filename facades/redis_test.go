@@ -124,7 +124,7 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 
 	mockQueue := mocksqueue.NewQueue(t)
 	mockJobStorer := mocksqueue.NewJobStorer(t)
-	mockQueue.EXPECT().GetJobStorer().Return(mockJobStorer)
+	mockQueue.EXPECT().JobStorer().Return(mockJobStorer)
 
 	realQueueInstance, err := redis.NewQueue(context.Background(), mockConfig, mockQueue, json.New(), connectionName)
 	if err != nil {

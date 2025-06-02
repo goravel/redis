@@ -54,7 +54,7 @@ func (s *QueueTestSuite) SetupSuite() {
 
 	mockQueue := mocksqueue.NewQueue(s.T())
 	s.mockJobStorer = mocksqueue.NewJobStorer(s.T())
-	mockQueue.EXPECT().GetJobStorer().Return(s.mockJobStorer).Once()
+	mockQueue.EXPECT().JobStorer().Return(s.mockJobStorer).Once()
 
 	s.mockQueue = mockQueue
 	s.ctx = context.Background()

@@ -5,7 +5,7 @@ import (
 
 	contractsfoundation "github.com/goravel/framework/contracts/foundation"
 	contractsqueue "github.com/goravel/framework/contracts/queue"
-	"github.com/goravel/framework/queue"
+	"github.com/goravel/framework/queue/utils"
 	"github.com/goravel/framework/support/carbon"
 	"github.com/redis/go-redis/v9"
 )
@@ -22,7 +22,7 @@ type ReservedJob struct {
 }
 
 func NewReservedJob(ctx context.Context, client *redis.Client, jobRecord JobRecord, jobStorer contractsqueue.JobStorer, json contractsfoundation.Json, reservedQueueKey string) (*ReservedJob, error) {
-	task, err := queue.JsonToTask(jobRecord.Playload, jobStorer, json)
+	task, err := utils.JsonToTask(jobRecord.Playload, jobStorer, json)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (r *JobRecord) Touch() *carbon.DateTime {
 }
 
 func taskToJobRecordJson(task contractsqueue.Task, json contractsfoundation.Json) (string, error) {
-	payload, err := queue.TaskToJson(task, json)
+	payload, err := utils.TaskToJson(task, json)
 	if err != nil {
 		return "", err
 	}

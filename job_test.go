@@ -100,7 +100,6 @@ func (s *ReservedJobTestSuite) TestNewReservedJob() {
 			},
 			Delay: carbon.Parse("2025-05-28T19:50:57Z").StdTime(),
 		},
-		Chain: []contractsqueue.ChainJob{},
 	}, reservedJob.task)
 }
 
@@ -155,5 +154,5 @@ func TestTaskToJobRecordJson(t *testing.T) {
 	json, err := taskToJobRecordJson(task, json.New())
 
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"playload\":\"{\\\"signature\\\":\\\"mock\\\",\\\"args\\\":null,\\\"delay\\\":null,\\\"uuid\\\":\\\"test-uuid\\\",\\\"chain\\\":[]}\",\"attempts\":0,\"reserved_at\":null}", json)
+	assert.Equal(t, "{\"playload\":\"{\\\"signature\\\":\\\"mock\\\",\\\"args\\\":null,\\\"delay\\\":null,\\\"uuid\\\":\\\"test-uuid\\\",\\\"chain\\\":null}\",\"attempts\":0,\"reserved_at\":null}", json)
 }

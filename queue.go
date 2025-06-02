@@ -47,7 +47,7 @@ func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Qu
 	return &Queue{
 		ctx:       ctx,
 		client:    client,
-		jobStorer: queue.GetJobStorer(),
+		jobStorer: queue.JobStorer(),
 		json:      json,
 		queueKey:  NewQueueKey(config.GetString("app.name", "goravel"), connection),
 	}, nil
