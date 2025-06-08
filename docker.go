@@ -21,16 +21,16 @@ type Docker struct {
 
 func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store))
-	redisConfigPath := fmt.Sprintf("database.redis.%s", connection)
-	host := config.GetString(fmt.Sprintf("%s.host", redisConfigPath))
+	configPrefix := fmt.Sprintf("database.redis.%s", connection)
+	host := config.GetString(fmt.Sprintf("%s.host", configPrefix))
 	if host == "" {
-		return nil, fmt.Errorf("redis host is not configured for connection [%s] at path '%s.host'", connection, redisConfigPath)
+		return nil, fmt.Errorf("redis host is not configured for connection [%s] at path '%s.host'", connection, configPrefix)
 	}
 
-	port := config.GetInt(fmt.Sprintf("%s.port", redisConfigPath), 6379)
-	username := config.GetString(fmt.Sprintf("%s.username", redisConfigPath))
-	password := config.GetString(fmt.Sprintf("%s.password", redisConfigPath))
-	database := config.GetInt(fmt.Sprintf("%s.database", redisConfigPath), 0)
+	port := config.GetInt(fmt.Sprintf("%s.port", configPrefix), 6379)
+	username := config.GetString(fmt.Sprintf("%s.username", configPrefix))
+	password := config.GetString(fmt.Sprintf("%s.password", configPrefix))
+	database := config.GetInt(fmt.Sprintf("%s.database", configPrefix), 0)
 
 	return &Docker{
 		config: contractsdocker.CacheConfig{
