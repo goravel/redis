@@ -8,22 +8,16 @@ import (
 	"time"
 
 	mocksconfig "github.com/goravel/framework/mocks/config"
-	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-)
-
-var (
-	testCacheRedisConnection = "cache-default"
 )
 
 type CacheTestSuite struct {
 	suite.Suite
-	mockConfig *mocksconfig.Config
-	redis      *Cache
+	docker *Docker
+	cache  *Cache
 }
 
 func TestCacheTestSuite(t *testing.T) {
@@ -31,73 +25,73 @@ func TestCacheTestSuite(t *testing.T) {
 		t.Skip("Skipping tests of using docker")
 	}
 
-	redisDocker := docker.NewRedis()
-	assert.Nil(t, redisDocker.Build())
+	suite.Run(t, &CacheTestSuite{})
+}
 
-	mockConfig := &mocksconfig.Config{}
-	mockConfig.EXPECT().GetString("cache.stores.redis.connection", "default").Return(testCacheRedisConnection).Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testCacheRedisConnection)).Return("localhost").Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testCacheRedisConnection), "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testCacheRedisConnection)).Return("").Once()
-	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testCacheRedisConnection)).Return("").Once()
-	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testCacheRedisConnection), 0).Return(0).Once()
-	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testCacheRedisConnection)).Return(nil).Once()
+func (s *CacheTestSuite) SetupSuite() {
+	mockConfig := mocksconfig.NewConfig(s.T())
+	docker := initDocker(mockConfig)
+
+	mockGetClient(mockConfig, docker)
+
+	mockConfig.EXPECT().GetString(fmt.Sprintf("cache.stores.%s.connection", testStore), "default").Return(testConnection).Once()
 	mockConfig.EXPECT().GetString("cache.prefix").Return("goravel_cache").Once()
-	store, err := NewCache(context.Background(), mockConfig, "redis")
-	require.NoError(t, err)
-	mockConfig.AssertExpectations(t)
 
-	suite.Run(t, &CacheTestSuite{
-		redis: store,
-	})
+	store, err := NewCache(context.Background(), mockConfig, testStore)
+	s.Require().NoError(err)
 
-	assert.Nil(t, redisDocker.Shutdown())
+	s.cache = store
+	s.docker = docker
+}
+
+func (s *CacheTestSuite) TearDownSuite() {
+	s.NoError(s.docker.Shutdown())
 }
 
 func (s *CacheTestSuite) SetupTest() {
-	s.mockConfig = &mocksconfig.Config{}
+	clients = make(map[string]*redis.Client)
 }
 
 func (s *CacheTestSuite) TestAdd() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	s.False(s.redis.Add("name", "World", 1*time.Second))
-	s.True(s.redis.Add("name1", "World", 1*time.Second))
-	s.True(s.redis.Has("name1"))
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	s.False(s.cache.Add("name", "World", 1*time.Second))
+	s.True(s.cache.Add("name1", "World", 1*time.Second))
+	s.True(s.cache.Has("name1"))
 	time.Sleep(2 * time.Second)
-	s.False(s.redis.Has("name1"))
-	s.True(s.redis.Flush())
+	s.False(s.cache.Has("name1"))
+	s.True(s.cache.Flush())
 }
 
 func (s *CacheTestSuite) TestDecrement() {
-	res, err := s.redis.Decrement("decrement")
+	res, err := s.cache.Decrement("decrement")
 	s.Equal(int64(-1), res)
 	s.Nil(err)
 
-	s.Equal(int64(-1), s.redis.GetInt64("decrement"))
+	s.Equal(int64(-1), s.cache.GetInt64("decrement"))
 
-	res, err = s.redis.Decrement("decrement", 2)
+	res, err = s.cache.Decrement("decrement", 2)
 	s.Equal(int64(-3), res)
 	s.Nil(err)
 
-	res, err = s.redis.Decrement("decrement1", 2)
+	res, err = s.cache.Decrement("decrement1", 2)
 	s.Equal(int64(-2), res)
 	s.Nil(err)
 
-	s.Equal(int64(-2), s.redis.GetInt64("decrement1"))
+	s.Equal(int64(-2), s.cache.GetInt64("decrement1"))
 
 	decrement2 := int64(4)
-	s.True(s.redis.Add("decrement2", &decrement2, 2*time.Second))
-	res, err = s.redis.Decrement("decrement2")
+	s.True(s.cache.Add("decrement2", &decrement2, 2*time.Second))
+	res, err = s.cache.Decrement("decrement2")
 	s.Equal(int64(3), res)
 	s.Nil(err)
 
-	res, err = s.redis.Decrement("decrement2", 2)
+	res, err = s.cache.Decrement("decrement2", 2)
 	s.Equal(int64(1), res)
 	s.Nil(err)
 }
 
 func (s *CacheTestSuite) TestDecrementWithConcurrent() {
-	res, err := s.redis.Decrement("decrement_concurrent")
+	res, err := s.cache.Decrement("decrement_concurrent")
 	s.Equal(int64(-1), res)
 	s.Nil(err)
 
@@ -105,7 +99,7 @@ func (s *CacheTestSuite) TestDecrementWithConcurrent() {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			_, err = s.redis.Decrement("decrement_concurrent", 1)
+			_, err = s.cache.Decrement("decrement_concurrent", 1)
 			s.Nil(err)
 			wg.Done()
 		}()
@@ -113,99 +107,99 @@ func (s *CacheTestSuite) TestDecrementWithConcurrent() {
 
 	wg.Wait()
 
-	res = s.redis.GetInt64("decrement_concurrent")
+	res = s.cache.GetInt64("decrement_concurrent")
 	s.Equal(int64(-1001), res)
 	s.Nil(err)
 }
 
 func (s *CacheTestSuite) TestForever() {
-	s.True(s.redis.Forever("name", "Goravel"))
-	s.Equal("Goravel", s.redis.Get("name", "").(string))
-	s.True(s.redis.Flush())
+	s.True(s.cache.Forever("name", "Goravel"))
+	s.Equal("Goravel", s.cache.Get("name", "").(string))
+	s.True(s.cache.Flush())
 }
 
 func (s *CacheTestSuite) TestForget() {
-	val := s.redis.Forget("test-forget")
+	val := s.cache.Forget("test-forget")
 	s.True(val)
 
-	err := s.redis.Put("test-forget", "goravel", 5*time.Second)
+	err := s.cache.Put("test-forget", "goravel", 5*time.Second)
 	s.Nil(err)
-	s.True(s.redis.Forget("test-forget"))
+	s.True(s.cache.Forget("test-forget"))
 }
 
 func (s *CacheTestSuite) TestFlush() {
-	s.Nil(s.redis.Put("test-flush", "goravel", 5*time.Second))
-	s.Equal("goravel", s.redis.Get("test-flush", nil).(string))
+	s.Nil(s.cache.Put("test-flush", "goravel", 5*time.Second))
+	s.Equal("goravel", s.cache.Get("test-flush", nil).(string))
 
-	s.True(s.redis.Flush())
-	s.False(s.redis.Has("test-flush"))
+	s.True(s.cache.Flush())
+	s.False(s.cache.Has("test-flush"))
 }
 
 func (s *CacheTestSuite) TestGet() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	s.Equal("Goravel", s.redis.Get("name", "").(string))
-	s.Equal("World", s.redis.Get("name1", "World").(string))
-	s.Equal("World1", s.redis.Get("name2", func() any {
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	s.Equal("Goravel", s.cache.Get("name", "").(string))
+	s.Equal("World", s.cache.Get("name1", "World").(string))
+	s.Equal("World1", s.cache.Get("name2", func() any {
 		return "World1"
 	}).(string))
-	s.True(s.redis.Forget("name"))
-	s.True(s.redis.Flush())
+	s.True(s.cache.Forget("name"))
+	s.True(s.cache.Flush())
 }
 
 func (s *CacheTestSuite) TestGetBool() {
-	s.Equal(true, s.redis.GetBool("test-get-bool", true))
-	s.Nil(s.redis.Put("test-get-bool", true, 2*time.Second))
-	s.Equal(true, s.redis.GetBool("test-get-bool", false))
+	s.Equal(true, s.cache.GetBool("test-get-bool", true))
+	s.Nil(s.cache.Put("test-get-bool", true, 2*time.Second))
+	s.Equal(true, s.cache.GetBool("test-get-bool", false))
 }
 
 func (s *CacheTestSuite) TestGetInt() {
-	s.Equal(2, s.redis.GetInt("test-get-int", 2))
-	s.Nil(s.redis.Put("test-get-int", 3, 2*time.Second))
-	s.Equal(3, s.redis.GetInt("test-get-int", 2))
+	s.Equal(2, s.cache.GetInt("test-get-int", 2))
+	s.Nil(s.cache.Put("test-get-int", 3, 2*time.Second))
+	s.Equal(3, s.cache.GetInt("test-get-int", 2))
 }
 
 func (s *CacheTestSuite) TestGetString() {
-	s.Equal("2", s.redis.GetString("test-get-string", "2"))
-	s.Nil(s.redis.Put("test-get-string", "3", 2*time.Second))
-	s.Equal("3", s.redis.GetString("test-get-string", "2"))
+	s.Equal("2", s.cache.GetString("test-get-string", "2"))
+	s.Nil(s.cache.Put("test-get-string", "3", 2*time.Second))
+	s.Equal("3", s.cache.GetString("test-get-string", "2"))
 }
 
 func (s *CacheTestSuite) TestHas() {
-	s.False(s.redis.Has("test-has"))
-	s.Nil(s.redis.Put("test-has", "goravel", 5*time.Second))
-	s.True(s.redis.Has("test-has"))
+	s.False(s.cache.Has("test-has"))
+	s.Nil(s.cache.Put("test-has", "goravel", 5*time.Second))
+	s.True(s.cache.Has("test-has"))
 }
 
 func (s *CacheTestSuite) TestIncrement() {
-	res, err := s.redis.Increment("Increment")
+	res, err := s.cache.Increment("Increment")
 	s.Equal(int64(1), res)
 	s.Nil(err)
 
-	s.Equal(int64(1), s.redis.GetInt64("Increment"))
+	s.Equal(int64(1), s.cache.GetInt64("Increment"))
 
-	res, err = s.redis.Increment("Increment", 2)
+	res, err = s.cache.Increment("Increment", 2)
 	s.Equal(int64(3), res)
 	s.Nil(err)
 
-	res, err = s.redis.Increment("Increment1", 2)
+	res, err = s.cache.Increment("Increment1", 2)
 	s.Equal(int64(2), res)
 	s.Nil(err)
 
-	s.Equal(int64(2), s.redis.GetInt64("Increment1"))
+	s.Equal(int64(2), s.cache.GetInt64("Increment1"))
 
 	increment2 := int64(1)
-	s.True(s.redis.Add("Increment2", &increment2, 2*time.Second))
-	res, err = s.redis.Increment("Increment2")
+	s.True(s.cache.Add("Increment2", &increment2, 2*time.Second))
+	res, err = s.cache.Increment("Increment2")
 	s.Equal(int64(2), res)
 	s.Nil(err)
 
-	res, err = s.redis.Increment("Increment2", 2)
+	res, err = s.cache.Increment("Increment2", 2)
 	s.Equal(int64(4), res)
 	s.Nil(err)
 }
 
 func (s *CacheTestSuite) TestIncrementWithConcurrent() {
-	res, err := s.redis.Increment("decrement_concurrent")
+	res, err := s.cache.Increment("decrement_concurrent")
 	s.Equal(int64(1), res)
 	s.Nil(err)
 
@@ -213,7 +207,7 @@ func (s *CacheTestSuite) TestIncrementWithConcurrent() {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			_, err = s.redis.Increment("decrement_concurrent", 1)
+			_, err = s.cache.Increment("decrement_concurrent", 1)
 			s.Nil(err)
 			wg.Done()
 		}()
@@ -221,7 +215,7 @@ func (s *CacheTestSuite) TestIncrementWithConcurrent() {
 
 	wg.Wait()
 
-	res = s.redis.GetInt64("decrement_concurrent")
+	res = s.cache.GetInt64("decrement_concurrent")
 	s.Equal(int64(1001), res)
 	s.Nil(err)
 }
@@ -234,10 +228,10 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "once got lock, lock can't be got again",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.False(lock1.Get())
 
 				lock.Release()
@@ -246,12 +240,12 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "lock can be got again when had been released",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
 				s.True(lock.Release())
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.True(lock1.Get())
 
 				s.True(lock1.Release())
@@ -260,10 +254,10 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "lock cannot be released when had been got",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.False(lock1.Get())
 				s.False(lock1.Release())
 
@@ -273,10 +267,10 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "lock can be force released",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.False(lock1.Get())
 				s.False(lock1.Release())
 				s.True(lock1.ForceRelease())
@@ -287,12 +281,12 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "lock can be got again when timeout",
 			setup: func() {
-				lock := s.redis.Lock("lock", 1*time.Second)
+				lock := s.cache.Lock("lock", 1*time.Second)
 				s.True(lock.Get())
 
 				time.Sleep(2 * time.Second)
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.True(lock1.Get())
 				s.True(lock1.Release())
 			},
@@ -300,12 +294,12 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "lock can be got again when had been released by callback",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get(func() {
 					s.True(true)
 				}))
 
-				lock1 := s.redis.Lock("lock")
+				lock1 := s.cache.Lock("lock")
 				s.True(lock1.Get())
 				s.True(lock1.Release())
 			},
@@ -313,11 +307,11 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "block wait out",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
 				go func() {
-					lock1 := s.redis.Lock("lock")
+					lock1 := s.cache.Lock("lock")
 					s.NotNil(lock1.Block(1 * time.Second))
 				}()
 
@@ -329,11 +323,11 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "get lock by block when just timeout",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
 				go func() {
-					lock1 := s.redis.Lock("lock")
+					lock1 := s.cache.Lock("lock")
 					s.True(lock1.Block(2 * time.Second))
 					s.True(lock1.Release())
 				}()
@@ -348,11 +342,11 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "get lock by block",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
 				go func() {
-					lock1 := s.redis.Lock("lock")
+					lock1 := s.cache.Lock("lock")
 					s.True(lock1.Block(3 * time.Second))
 					s.True(lock1.Release())
 				}()
@@ -367,11 +361,11 @@ func (s *CacheTestSuite) TestLock() {
 		{
 			name: "get lock by block with callback",
 			setup: func() {
-				lock := s.redis.Lock("lock")
+				lock := s.cache.Lock("lock")
 				s.True(lock.Get())
 
 				go func() {
-					lock1 := s.redis.Lock("lock")
+					lock1 := s.cache.Lock("lock")
 					s.True(lock1.Block(2*time.Second, func() {
 						s.True(true)
 					}))
@@ -394,50 +388,59 @@ func (s *CacheTestSuite) TestLock() {
 }
 
 func (s *CacheTestSuite) TestPull() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	s.True(s.redis.Has("name"))
-	s.Equal("Goravel", s.redis.Pull("name", "").(string))
-	s.False(s.redis.Has("name"))
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	s.True(s.cache.Has("name"))
+	s.Equal("Goravel", s.cache.Pull("name", "").(string))
+	s.False(s.cache.Has("name"))
 }
 
 func (s *CacheTestSuite) TestPut() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	s.True(s.redis.Has("name"))
-	s.Equal("Goravel", s.redis.Get("name", "").(string))
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	s.True(s.cache.Has("name"))
+	s.Equal("Goravel", s.cache.Get("name", "").(string))
 	time.Sleep(2 * time.Second)
-	s.False(s.redis.Has("name"))
+	s.False(s.cache.Has("name"))
 }
 
 func (s *CacheTestSuite) TestRemember() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	value, err := s.redis.Remember("name", 1*time.Second, func() (any, error) {
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	value, err := s.cache.Remember("name", 1*time.Second, func() (any, error) {
 		return "World", nil
 	})
 	s.Nil(err)
 	s.Equal("Goravel", value)
 
-	value, err = s.redis.Remember("name1", 1*time.Second, func() (any, error) {
+	value, err = s.cache.Remember("name1", 1*time.Second, func() (any, error) {
 		return "World1", nil
 	})
 	s.Nil(err)
 	s.Equal("World1", value)
 	time.Sleep(2 * time.Second)
-	s.False(s.redis.Has("name1"))
-	s.True(s.redis.Flush())
+	s.False(s.cache.Has("name1"))
+	s.True(s.cache.Flush())
 }
 
 func (s *CacheTestSuite) TestRememberForever() {
-	s.Nil(s.redis.Put("name", "Goravel", 1*time.Second))
-	value, err := s.redis.RememberForever("name", func() (any, error) {
+	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
+	value, err := s.cache.RememberForever("name", func() (any, error) {
 		return "World", nil
 	})
 	s.Nil(err)
 	s.Equal("Goravel", value)
 
-	value, err = s.redis.RememberForever("name1", func() (any, error) {
+	value, err = s.cache.RememberForever("name1", func() (any, error) {
 		return "World1", nil
 	})
 	s.Nil(err)
 	s.Equal("World1", value)
-	s.True(s.redis.Flush())
+	s.True(s.cache.Flush())
+}
+
+func mockGetClient(mockConfig *mocksconfig.Config, docker *Docker) {
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.host", testConnection)).Return(docker.Config().Host).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.port", testConnection), "6379").Return(cast.ToString(docker.Config().Port)).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testConnection)).Return(docker.Config().Username).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testConnection)).Return(docker.Config().Password).Once()
+	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(cast.ToInt(docker.Config().Database)).Once()
+	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testConnection)).Return(nil).Once()
 }

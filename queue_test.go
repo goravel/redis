@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -12,10 +13,8 @@ import (
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	mocksqueue "github.com/goravel/framework/mocks/queue"
 	"github.com/goravel/framework/support/carbon"
-	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -26,7 +25,7 @@ type QueueTestSuite struct {
 	mockJobStorer *mocksqueue.JobStorer
 	ctx           context.Context
 	queue         *Queue
-	redisDocker   *docker.Redis
+	docker        *Docker
 }
 
 func TestQueueTestSuite(t *testing.T) {
@@ -38,19 +37,13 @@ func TestQueueTestSuite(t *testing.T) {
 }
 
 func (s *QueueTestSuite) SetupSuite() {
-	redisDocker := docker.NewRedis()
-	s.Nil(redisDocker.Build())
-	s.redisDocker = redisDocker
-
 	mockConfig := mocksconfig.NewConfig(s.T())
+	docker := initDocker(mockConfig)
+
+	mockGetClient(mockConfig, docker)
+
 	mockConfig.EXPECT().GetString("app.name", "goravel").Return("test").Once()
-	mockConfig.EXPECT().GetString("queue.connections.redis.connection", "default").Return("queue-default").Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.queue-default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.queue-default.database", 0).Return(0).Once()
-	mockConfig.EXPECT().Get("database.redis.queue-default.tls").Return(nil).Once()
+	mockConfig.EXPECT().GetString(fmt.Sprintf("queue.connections.%s.connection", testConnection), "default").Return(testConnection).Once()
 
 	mockQueue := mocksqueue.NewQueue(s.T())
 	s.mockJobStorer = mocksqueue.NewJobStorer(s.T())
@@ -59,17 +52,19 @@ func (s *QueueTestSuite) SetupSuite() {
 	s.mockQueue = mockQueue
 	s.ctx = context.Background()
 
-	queue, err := NewQueue(s.ctx, mockConfig, mockQueue, json.New(), "redis")
+	queue, err := NewQueue(s.ctx, mockConfig, mockQueue, json.New(), testConnection)
 	s.Nil(err)
+
+	s.docker = docker
 	s.queue = queue
 }
 
 func (s *QueueTestSuite) TearDownSuite() {
-	s.NoError(s.redisDocker.Shutdown())
+	s.NoError(s.docker.Shutdown())
 }
 
 func (s *QueueTestSuite) SetupTest() {
-
+	clients = make(map[string]*redis.Client)
 }
 
 func (s *QueueTestSuite) Test_Driver() {
