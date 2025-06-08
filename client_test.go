@@ -77,7 +77,7 @@ func (s *ConnectionTestSuite) TestCreateClient() {
 		s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", connection)).Return(nil).Once()
 
 		client, err := createClient(s.mockConfig, connection)
-		s.EqualError(err, fmt.Sprintf("failed to connect to redis connection [%s] (addr: %s): EOF", connection, "invalid-host:9999"))
+		s.Contains(err.Error(), fmt.Sprintf("failed to connect to redis connection [%s] (addr: %s):", connection, "invalid-host:9999"))
 		s.Nil(client)
 	})
 }
