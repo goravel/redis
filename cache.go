@@ -6,13 +6,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-	"github.com/spf13/cast"
-
 	"github.com/goravel/framework/cache"
 	contractscache "github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
 	contractshttp "github.com/goravel/framework/contracts/http"
+	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 
 	supportredis "github.com/goravel/redis/support/redis"
 )
@@ -60,6 +60,10 @@ func (r *Cache) Decrement(key string, value ...int64) (int64, error) {
 	}
 
 	return r.instance.DecrBy(r.ctx, r.key(key), value[0]).Result()
+}
+
+func (r *Cache) Docker() (contractsdocker.CacheDriver, error) {
+	return NewDocker(r.config, r.store)
 }
 
 // Forever Driver an item in the cache indefinitely.
