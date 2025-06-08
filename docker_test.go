@@ -12,6 +12,16 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	testStore      = "redis"
+	testConnection = "default"
+	testUsername   = "user"
+	testPassword   = "pass"
+	testPort       = 6379
+	testDatabase   = 0
+	testHost       = "localhost"
+)
+
 type DockerTestSuite struct {
 	suite.Suite
 	mockConfig *mocksconfig.Config
@@ -26,13 +36,6 @@ func (s *DockerTestSuite) SetupTest() {
 }
 
 func (s *DockerTestSuite) TestNewDocker() {
-	store := "redis"
-	connection := "default"
-	username := "user"
-	password := "pass"
-	port := 6379
-	database := 0
-
 	tests := []struct {
 		name          string
 		host          string
@@ -53,14 +56,14 @@ func (s *DockerTestSuite) TestNewDocker() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			s.mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", store)).Return(connection).Once()
-			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connection)).Return(test.host).Once()
-			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.port", connection), 6379).Return(port).Once()
-			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connection)).Return(username).Once()
-			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connection)).Return(password).Once()
-			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connection), 0).Return(database).Once()
+			s.mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", testStore)).Return(testConnection).Once()
+			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testConnection)).Return(test.host).Once()
+			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.port", testConnection), 6379).Return(testPort).Once()
+			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testConnection)).Return(testUsername).Once()
+			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
+			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(testDatabase).Once()
 
-			docker, err := NewDocker(s.mockConfig, store)
+			docker, err := NewDocker(s.mockConfig, testStore)
 
 			if test.expectedError {
 				assert.Error(s.T(), err)
@@ -69,10 +72,10 @@ func (s *DockerTestSuite) TestNewDocker() {
 				s.NoError(err)
 				s.NotNil(docker)
 				s.Equal(test.host, docker.config.Host)
-				s.Equal(port, docker.config.Port)
-				s.Equal(username, docker.config.Username)
-				s.Equal(password, docker.config.Password)
-				s.Equal(fmt.Sprintf("%d", database), docker.config.Database)
+				s.Equal(testPort, docker.config.Port)
+				s.Equal(testUsername, docker.config.Username)
+				s.Equal(testPassword, docker.config.Password)
+				s.Equal(fmt.Sprintf("%d", testDatabase), docker.config.Database)
 			}
 		})
 	}
@@ -159,4 +162,28 @@ func (s *DockerTestSuite) TestBuildReadyFreshShutdown() {
 
 	err = docker.Shutdown()
 	s.NoError(err)
+}
+
+func initDocker(mockConfig *mocksconfig.Config) *Docker {
+	mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", testStore)).Return(testConnection).Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testConnection)).Return(testHost).Once()
+	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.port", testConnection), 6379).Return(testPort).Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testConnection)).Return("").Once()
+	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
+	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(testDatabase).Once()
+
+	docker, err := NewDocker(mockConfig, testStore)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := docker.Build(); err != nil {
+		panic(err)
+	}
+
+	if err := docker.Ready(); err != nil {
+		panic(err)
+	}
+
+	return docker
 }

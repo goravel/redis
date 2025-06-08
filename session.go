@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/session"
-
-	supportredis "github.com/goravel/redis/support/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 // Ensure Redis driver satisfies the session.Driver interface at compile time.
@@ -30,7 +27,7 @@ func NewSession(ctx context.Context, config config.Config, driver string) (*Sess
 
 	connection := config.GetString(fmt.Sprintf("session.drivers.%s.connection", driver), "default")
 
-	client, err := supportredis.GetClient(config, connection)
+	client, err := getClient(config, connection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}

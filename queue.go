@@ -11,8 +11,6 @@ import (
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
-
-	supportredis "github.com/goravel/redis/support/redis"
 )
 
 type Task struct {
@@ -39,7 +37,7 @@ type Queue struct {
 
 func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, json foundation.Json, connection string) (*Queue, error) {
 	clientConnection := config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
-	client, err := supportredis.GetClient(config, clientConnection)
+	client, err := getClient(config, clientConnection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}

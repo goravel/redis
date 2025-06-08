@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
-
 	"github.com/redis/go-redis/v9"
 )
 
@@ -22,17 +21,16 @@ var (
 // createClient initializes a new Redis client based on configuration.
 // It performs a PING check to ensure connectivity.
 func createClient(config config.Config, connection string) (*redis.Client, error) {
-
-	redisConfigPath := fmt.Sprintf("database.redis.%s", connection)
-
-	host := config.GetString(fmt.Sprintf("%s.host", redisConfigPath))
+	configPrefix := fmt.Sprintf("database.redis.%s", connection)
+	host := config.GetString(fmt.Sprintf("%s.host", configPrefix))
 	if host == "" {
-		return nil, fmt.Errorf("redis host is not configured for connection [%s] at path '%s.host'", connection, redisConfigPath)
+		return nil, fmt.Errorf("redis host is not configured for connection [%s] at path '%s.host'", connection, configPrefix)
 	}
-	port := config.GetString(fmt.Sprintf("%s.port", redisConfigPath), "6379") // Default port
-	username := config.GetString(fmt.Sprintf("%s.username", redisConfigPath)) // Optional
-	password := config.GetString(fmt.Sprintf("%s.password", redisConfigPath)) // Optional
-	db := config.GetInt(fmt.Sprintf("%s.database", redisConfigPath), 0)       // Default DB 0
+
+	port := config.GetString(fmt.Sprintf("%s.port", configPrefix), "6379")
+	username := config.GetString(fmt.Sprintf("%s.username", configPrefix))
+	password := config.GetString(fmt.Sprintf("%s.password", configPrefix))
+	db := config.GetInt(fmt.Sprintf("%s.database", configPrefix), 0)
 
 	options := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, port),
@@ -41,7 +39,7 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 		DB:       db,
 	}
 
-	tlsConfigRaw := config.Get(fmt.Sprintf("%s.tls", redisConfigPath))
+	tlsConfigRaw := config.Get(fmt.Sprintf("%s.tls", configPrefix))
 	if tlsConfig, ok := tlsConfigRaw.(*tls.Config); ok && tlsConfig != nil {
 		options.TLSConfig = tlsConfig
 	}
@@ -61,11 +59,11 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 	return client, nil
 }
 
-// GetClient returns a Redis client for the specified connection name.
+// getClient returns a Redis client for the specified connection name.
 // It uses a cached instance if one already exists for the name, otherwise,
 // it creates, caches, and returns a new one. It is thread-safe.
 // Returns an error if the client cannot be created or configured correctly.
-func GetClient(config config.Config, connection string) (*redis.Client, error) {
+func getClient(config config.Config, connection string) (*redis.Client, error) {
 	// 1. Fast path: Check if client exists with read lock (allows concurrent reads)
 	mu.RLock()
 	client, exists := clients[connection]

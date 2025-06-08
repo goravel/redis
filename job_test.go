@@ -10,14 +10,10 @@ import (
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	mocksqueue "github.com/goravel/framework/mocks/queue"
 	"github.com/goravel/framework/support/carbon"
-	"github.com/goravel/framework/support/docker"
 	"github.com/goravel/framework/support/env"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
-	supportredis "github.com/goravel/redis/support/redis"
 )
 
 type ReservedJobTestSuite struct {
@@ -25,7 +21,7 @@ type ReservedJobTestSuite struct {
 	ctx              context.Context
 	client           *redis.Client
 	mockJobStorer    *mocksqueue.JobStorer
-	redisDocker      *docker.Redis
+	docker           *Docker
 	reservedQueueKey string
 }
 
@@ -40,33 +36,26 @@ func TestReservedJobTestSuite(t *testing.T) {
 func (s *ReservedJobTestSuite) SetupSuite() {
 	carbon.SetTestNow(carbon.Now())
 
-	redisDocker := docker.NewRedis()
-	s.Nil(redisDocker.Build())
-	s.redisDocker = redisDocker
-
 	mockConfig := mocksconfig.NewConfig(s.T())
-	mockConfig.EXPECT().GetString("database.redis.job-default.host").Return("localhost").Once()
-	mockConfig.EXPECT().GetString("database.redis.job-default.port", "6379").Return(cast.ToString(redisDocker.Config().Port)).Once()
-	mockConfig.EXPECT().GetString("database.redis.job-default.username").Return("").Once()
-	mockConfig.EXPECT().GetString("database.redis.job-default.password").Return("").Once()
-	mockConfig.EXPECT().GetInt("database.redis.job-default.database", 0).Return(0).Once()
-	mockConfig.EXPECT().Get("database.redis.job-default.tls").Return(nil).Once()
+	docker := initDocker(mockConfig)
 
-	client, err := supportredis.GetClient(mockConfig, "job-default")
-	s.Nil(err)
+	client, err := docker.connect()
+	s.Require().NoError(err)
 
 	s.ctx = context.Background()
 	s.client = client
+	s.docker = docker
 	s.mockJobStorer = mocksqueue.NewJobStorer(s.T())
 	s.reservedQueueKey = "test-reserved-queue"
 }
 
 func (s *ReservedJobTestSuite) TearDownSuite() {
-	s.NoError(s.redisDocker.Shutdown())
+	s.NoError(s.docker.Shutdown())
 	carbon.ClearTestNow()
 }
 
 func (s *ReservedJobTestSuite) SetupTest() {
+	clients = make(map[string]*redis.Client)
 }
 
 func (s *ReservedJobTestSuite) TestNewReservedJob() {

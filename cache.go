@@ -13,8 +13,6 @@ import (
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
-
-	supportredis "github.com/goravel/redis/support/redis"
 )
 
 var _ contractscache.Driver = &Cache{}
@@ -30,7 +28,7 @@ type Cache struct {
 func NewCache(ctx context.Context, config config.Config, store string) (*Cache, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
 
-	client, err := supportredis.GetClient(config, connection)
+	client, err := getClient(config, connection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}
