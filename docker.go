@@ -60,7 +60,7 @@ func (r *Docker) Build() error {
 	}
 
 	r.config.ContainerID = containerID
-	r.config.Port = supportdocker.ExposedPort(exposedPorts, 6379)
+	r.config.Port = supportdocker.ExposedPort(exposedPorts, r.config.Port)
 
 	return nil
 }
