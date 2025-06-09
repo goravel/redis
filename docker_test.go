@@ -7,6 +7,7 @@ import (
 
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
 	mocksconfig "github.com/goravel/framework/mocks/config"
+	testingdocker "github.com/goravel/framework/testing/docker"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -81,24 +82,6 @@ func (s *DockerTestSuite) TestNewDocker() {
 	}
 }
 
-func (s *DockerTestSuite) TestImage() {
-	docker := &Docker{}
-
-	newImage := contractsdocker.Image{
-		Repository:   "custom-redis",
-		Tag:          "7.0",
-		ExposedPorts: []string{"6380"},
-		Args:         []string{"--custom-arg"},
-	}
-
-	docker.Image(newImage)
-
-	s.Equal(newImage.Repository, docker.image.Repository)
-	s.Equal(newImage.Tag, docker.image.Tag)
-	s.Equal(newImage.ExposedPorts, docker.image.ExposedPorts)
-	s.Equal(newImage.Args, docker.image.Args)
-}
-
 func (s *DockerTestSuite) TestConfig() {
 	docker := &Docker{}
 
@@ -126,12 +109,12 @@ func (s *DockerTestSuite) TestBuildReadyFreshShutdown() {
 			Password: "123123",
 			Database: "0",
 		},
-		image: &contractsdocker.Image{
+		imageDriver: testingdocker.NewImageDriver(contractsdocker.Image{
 			Repository:   "redis",
 			Tag:          "latest",
 			ExposedPorts: []string{"6379"},
 			Args:         []string{"--requirepass 123123"},
-		},
+		}),
 	}
 
 	err := docker.Build()
@@ -167,7 +150,6 @@ func (s *DockerTestSuite) TestBuildReadyFreshShutdown() {
 func initDocker(mockConfig *mocksconfig.Config) *Docker {
 	mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", testStore)).Return(testConnection).Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testConnection)).Return(testHost).Once()
-	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.port", testConnection), 6379).Return(testPort).Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testConnection)).Return("").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
 	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(testDatabase).Once()
