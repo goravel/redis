@@ -8,15 +8,14 @@ import (
 
 	contractsconfig "github.com/goravel/framework/contracts/config"
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
-	supportdocker "github.com/goravel/framework/support/docker"
-	"github.com/goravel/framework/support/process"
+	testingdocker "github.com/goravel/framework/testing/docker"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 )
 
 type Docker struct {
-	config contractsdocker.CacheConfig
-	image  *contractsdocker.Image
+	config      contractsdocker.CacheConfig
+	imageDriver contractsdocker.ImageDriver
 }
 
 func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
@@ -27,7 +26,6 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 		return nil, fmt.Errorf("redis host is not configured for connection [%s] at path '%s.host'", connection, configPrefix)
 	}
 
-	port := config.GetInt(fmt.Sprintf("%s.port", configPrefix), 6379)
 	username := config.GetString(fmt.Sprintf("%s.username", configPrefix))
 	password := config.GetString(fmt.Sprintf("%s.password", configPrefix))
 	database := config.GetInt(fmt.Sprintf("%s.database", configPrefix), 0)
@@ -37,30 +35,26 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 			Database: strconv.Itoa(database),
 			Host:     host,
 			Password: password,
-			Port:     port,
+			Port:     6379,
 			Username: username,
 		},
-		image: &contractsdocker.Image{
+		imageDriver: testingdocker.NewImageDriver(contractsdocker.Image{
 			Repository:   "redis",
 			Tag:          "latest",
-			ExposedPorts: []string{strconv.Itoa(port)},
+			ExposedPorts: []string{"6379"},
 			Args:         []string{fmt.Sprintf("--requirepass %s", password)},
-		},
+		}),
 	}, nil
 }
 
 func (r *Docker) Build() error {
-	command, exposedPorts := supportdocker.ImageToCommand(r.image)
-	containerID, err := process.Run(command)
-	if err != nil {
-		return fmt.Errorf("init Redis docker error: %v", err)
-	}
-	if containerID == "" {
-		return fmt.Errorf("no container id return when creating Redis docker")
+	if err := r.imageDriver.Build(); err != nil {
+		return err
 	}
 
-	r.config.ContainerID = containerID
-	r.config.Port = supportdocker.ExposedPort(exposedPorts, r.config.Port)
+	config := r.imageDriver.Config()
+	r.config.ContainerID = config.ContainerID
+	r.config.Port = config.ExposedPorts[r.config.Port]
 
 	return nil
 }
@@ -83,7 +77,7 @@ func (r *Docker) Fresh() error {
 }
 
 func (r *Docker) Image(image contractsdocker.Image) {
-	r.image = &image
+	r.imageDriver = testingdocker.NewImageDriver(image)
 }
 
 func (r *Docker) Ready() error {
@@ -103,13 +97,7 @@ func (r *Docker) Reuse(containerID string, port int) error {
 }
 
 func (r *Docker) Shutdown() error {
-	if r.config.ContainerID != "" {
-		if _, err := process.Run(fmt.Sprintf("docker stop %s", r.config.ContainerID)); err != nil {
-			return fmt.Errorf("stop Redis docker error: %v", err)
-		}
-	}
-
-	return nil
+	return r.imageDriver.Shutdown()
 }
 
 func (r *Docker) connect() (*redis.Client, error) {
