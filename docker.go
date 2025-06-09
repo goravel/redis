@@ -8,6 +8,7 @@ import (
 
 	contractsconfig "github.com/goravel/framework/contracts/config"
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
+	supportdocker "github.com/goravel/framework/support/docker"
 	testingdocker "github.com/goravel/framework/testing/docker"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
@@ -54,7 +55,7 @@ func (r *Docker) Build() error {
 
 	config := r.imageDriver.Config()
 	r.config.ContainerID = config.ContainerID
-	r.config.Port = config.ExposedPorts[r.config.Port]
+	r.config.Port = cast.ToInt(supportdocker.ExposedPort(config.ExposedPorts, strconv.Itoa(r.config.Port)))
 
 	return nil
 }
