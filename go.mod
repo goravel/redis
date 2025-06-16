@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/goravel/framework v1.15.2-0.20250609104359-90480ea9b358
-	github.com/redis/go-redis/v9 v9.9.0
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/spf13/cast v1.9.2
 	github.com/stretchr/testify v1.10.0
 )
