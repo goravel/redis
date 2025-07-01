@@ -31,6 +31,11 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 	password := config.GetString(fmt.Sprintf("%s.password", configPrefix))
 	database := config.GetInt(fmt.Sprintf("%s.database", configPrefix), 0)
 
+	var args []string
+	if password != "" {
+		args = append(args, fmt.Sprintf("--requirepass %s", password))
+	}
+
 	return &Docker{
 		config: contractsdocker.CacheConfig{
 			Database: strconv.Itoa(database),
@@ -43,7 +48,7 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 			Repository:   "redis",
 			Tag:          "latest",
 			ExposedPorts: []string{"6379"},
-			Args:         []string{fmt.Sprintf("--requirepass %s", password)},
+			Args:         args,
 		}),
 	}, nil
 }
