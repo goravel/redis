@@ -143,5 +143,5 @@ func TestTaskToJobRecordJson(t *testing.T) {
 	json, err := taskToJobRecordJson(task, json.New())
 
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"playload\":\"{\\\"signature\\\":\\\"mock\\\",\\\"args\\\":null,\\\"delay\\\":null,\\\"uuid\\\":\\\"test-uuid\\\",\\\"chain\\\":null}\",\"attempts\":0,\"reserved_at\":null}", json)
+	assert.Equal(t, `{"playload":"{\"delay\":null,\"signature\":\"mock\",\"args\":null,\"uuid\":\"test-uuid\",\"chain\":null}","attempts":0,"reserved_at":null}`, json)
 }

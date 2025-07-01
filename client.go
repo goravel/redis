@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
+	"github.com/goravel/framework/support/color"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -47,13 +48,16 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 	client := redis.NewClient(options)
 
 	// Verify the connection using PING with a timeout
-	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	if status := client.Ping(pingCtx); status.Err() != nil {
 		// Close the client if ping fails to release resources
-		_ = client.Close() // Ignore close error as the connection likely failed anyway
-		return nil, fmt.Errorf("failed to connect to redis connection [%s] (addr: %s): %w", connection, options.Addr, status.Err())
+		// _ = client.Close() // Ignore close error as the connection likely failed anyway
+		color.Warningf("Failed to connect to redis connection [%s] : %s\n", connection, status.Err())
+
+		// We want to initialize the Cache instance even if the connection is not successful, because the Cache.Docker function may be called in this situation.
+		return nil, nil
 	}
 
 	return client, nil
@@ -87,10 +91,12 @@ func getClient(config config.Config, connection string) (*redis.Client, error) {
 	// 4. Create the new client
 	newClient, err := createClient(config, connection)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize redis client for connection [%s]: %w", connection, err)
+		return nil, err
 	}
 
-	clients[connection] = newClient
+	if newClient != nil {
+		clients[connection] = newClient
+	}
 
 	return newClient, nil
 }

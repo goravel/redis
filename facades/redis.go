@@ -16,7 +16,7 @@ func Cache(store string) (cache.Driver, error) {
 		return nil, redis.ErrRedisStoreIsRequired
 	}
 
-	instance, err := redis.App.MakeWith(redis.CacheBinding, map[string]any{"store": store})
+	instance, err := redis.App.MakeWith(redis.BindingCache, map[string]any{"store": store})
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func Queue(connection string) (queue.Driver, error) {
 		return nil, redis.ErrRedisConnectionIsRequired
 	}
 
-	instance, err := redis.App.MakeWith(redis.QueueBinding, map[string]any{"connection": connection})
+	instance, err := redis.App.MakeWith(redis.BindingQueue, map[string]any{"connection": connection})
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func Session(driver string) (session.Driver, error) {
 		return nil, redis.ErrRedisConnectionIsRequired
 	}
 
-	instance, err := redis.App.MakeWith(redis.SessionBinding, map[string]any{"driver": driver})
+	instance, err := redis.App.MakeWith(redis.BindingSession, map[string]any{"driver": driver})
 	if err != nil {
 		return nil, err
 	}

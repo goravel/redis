@@ -47,7 +47,7 @@ func TestMakingSessionWithRealImplementation(t *testing.T) {
 		return
 	}
 
-	mockApp.EXPECT().MakeWith(redis.SessionBinding, map[string]any{"driver": connectionName}).
+	mockApp.EXPECT().MakeWith(redis.BindingSession, map[string]any{"driver": connectionName}).
 		Return(realSessionsInstance, nil)
 
 	driver, err := Session(connectionName)
@@ -92,7 +92,7 @@ func TestMakingCacheWithRealImplementation(t *testing.T) {
 		return
 	}
 
-	mockApp.EXPECT().MakeWith(redis.CacheBinding, map[string]any{"store": connectionName}).
+	mockApp.EXPECT().MakeWith(redis.BindingCache, map[string]any{"store": connectionName}).
 		Return(realCacheInstance, nil)
 
 	store, err := Cache(connectionName)
@@ -132,7 +132,7 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 		return
 	}
 
-	mockApp.EXPECT().MakeWith(redis.QueueBinding, map[string]any{"connection": connectionName}).
+	mockApp.EXPECT().MakeWith(redis.BindingQueue, map[string]any{"connection": connectionName}).
 		Return(realQueueInstance, nil)
 
 	store, err := Queue(connectionName)
