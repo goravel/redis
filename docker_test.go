@@ -38,30 +38,58 @@ func (s *DockerTestSuite) SetupTest() {
 
 func (s *DockerTestSuite) TestNewDocker() {
 	tests := []struct {
-		name          string
-		host          string
-		port          int
-		expectedError bool
+		name                string
+		host                string
+		password            string
+		port                int
+		expectedImageDriver *testingdocker.ImageDriver
+		expectedError       bool
 	}{
 		{
-			name:          "success",
-			host:          "localhost",
+			name:     "success",
+			host:     "localhost",
+			password: testPassword,
+			expectedImageDriver: testingdocker.NewImageDriver(contractsdocker.Image{
+				Repository:   "redis",
+				Tag:          "latest",
+				ExposedPorts: []string{"6379"},
+				Args:         []string{fmt.Sprintf("--requirepass %s", testPassword)},
+			}),
 			expectedError: false,
 		},
 		{
-			name:          "missing host",
-			host:          "",
+			name:     "missing host",
+			host:     "",
+			password: testPassword,
+			expectedImageDriver: testingdocker.NewImageDriver(contractsdocker.Image{
+				Repository:   "redis",
+				Tag:          "latest",
+				ExposedPorts: []string{"6379"},
+				Args:         []string{fmt.Sprintf("--requirepass %s", testPassword)},
+			}),
 			expectedError: true,
+		},
+		{
+			name:     "missing password",
+			host:     "localhost",
+			password: "",
+			expectedImageDriver: testingdocker.NewImageDriver(contractsdocker.Image{
+				Repository:   "redis",
+				Tag:          "latest",
+				ExposedPorts: []string{"6379"},
+			}),
+			expectedError: false,
 		},
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
+			s.SetupTest()
 			s.mockConfig.On("GetString", fmt.Sprintf("cache.stores.%s.connection", testStore)).Return(testConnection).Once()
 			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", testConnection)).Return(test.host).Once()
 			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.port", testConnection), 6379).Return(testPort).Once()
 			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", testConnection)).Return(testUsername).Once()
-			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
+			s.mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", testConnection)).Return(test.password).Once()
 			s.mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(testDatabase).Once()
 
 			docker, err := NewDocker(s.mockConfig, testStore)
@@ -75,8 +103,9 @@ func (s *DockerTestSuite) TestNewDocker() {
 				s.Equal(test.host, docker.config.Host)
 				s.Equal(testPort, docker.config.Port)
 				s.Equal(testUsername, docker.config.Username)
-				s.Equal(testPassword, docker.config.Password)
+				s.Equal(test.password, docker.config.Password)
 				s.Equal(fmt.Sprintf("%d", testDatabase), docker.config.Database)
+				s.Equal(test.expectedImageDriver, docker.imageDriver)
 			}
 		})
 	}
