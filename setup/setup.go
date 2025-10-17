@@ -43,14 +43,18 @@ var (
 )
 
 func main() {
+	cacheFacade := "Cache"
+
 	packages.Setup(os.Args).
 		Install(
 			modify.GoFile(path.Config("app.go")).
 				Find(match.Imports()).Modify(modify.AddImport(packages.GetModulePath())).
-				Find(match.Providers()).Modify(modify.Register("&redis.ServiceProvider{}", "&cache.ServiceProvider{}")),
-			modify.GoFile(path.Config("cache.go")).
-				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/cache"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
-				Find(match.Config("cache.stores")).Modify(modify.AddConfig("redis", cacheConfig)),
+				Find(match.Providers()).Modify(modify.Register("&redis.ServiceProvider{}")),
+			modify.WhenFacade(cacheFacade,
+				modify.GoFile(path.Config("cache.go")).
+					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/cache"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Config("cache.stores")).Modify(modify.AddConfig("redis", cacheConfig)),
+			),
 			modify.GoFile(path.Config("queue.go")).
 				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/queue"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
 				Find(match.Config("queue.connections")).Modify(modify.AddConfig("redis", queueConfig)),
