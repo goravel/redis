@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/goravel/framework/contracts/facades"
 	"github.com/goravel/framework/packages"
 	"github.com/goravel/framework/packages/match"
 	"github.com/goravel/framework/packages/modify"
@@ -43,34 +44,42 @@ var (
 )
 
 func main() {
-	cacheFacade := "Cache"
-
 	packages.Setup(os.Args).
 		Install(
+			// Add redis service provider to app.go
 			modify.GoFile(path.Config("app.go")).
 				Find(match.Imports()).Modify(modify.AddImport(packages.GetModulePath())).
 				Find(match.Providers()).Modify(modify.Register("&redis.ServiceProvider{}")),
-			modify.WhenFacade(cacheFacade,
-				modify.GoFile(path.Config("cache.go")).
-					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/cache"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("cache.stores")).Modify(modify.AddConfig("redis", cacheConfig)),
-			),
-			modify.GoFile(path.Config("queue.go")).
-				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/queue"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
-				Find(match.Config("queue.connections")).Modify(modify.AddConfig("redis", queueConfig)),
-			modify.GoFile(path.Config("session.go")).
-				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/session"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
-				Find(match.Config("session.drivers")).Modify(modify.AddConfig("redis", sessionConfig)),
+
+			// Add redis configuration to database.go
 			modify.GoFile(path.Config("database.go")).
 				Find(match.Config("database")).Modify(modify.AddConfig("redis", databaseConfig)),
+
+			// Add redis cache configuration to cache.go if
+			modify.GoFile(path.Config("cache.go")).
+				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/cache"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+				Find(match.Config("cache.stores")).Modify(modify.AddConfig("redis", cacheConfig)),
+
+			modify.WhenFacade(facades.Queue,
+				modify.GoFile(path.Config("queue.go")).
+					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/queue"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Config("queue.connections")).Modify(modify.AddConfig("redis", queueConfig)),
+			),
+			modify.WhenFacade(facades.Session,
+				modify.GoFile(path.Config("session.go")).
+					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/session"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Config("session.drivers")).Modify(modify.AddConfig("redis", sessionConfig)),
+			),
 		).
 		Uninstall(
 			modify.GoFile(path.Config("app.go")).
 				Find(match.Providers()).Modify(modify.Unregister("&redis.ServiceProvider{}")).
 				Find(match.Imports()).Modify(modify.RemoveImport(packages.GetModulePath())),
-			modify.GoFile(path.Config("cache.go")).
-				Find(match.Config("cache.stores")).Modify(modify.RemoveConfig("redis")).
-				Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/cache"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")),
+			modify.WhenFacade(facades.Cache,
+				modify.GoFile(path.Config("cache.go")).
+					Find(match.Config("cache.stores")).Modify(modify.RemoveConfig("redis")).
+					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/cache"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")),
+			),
 			modify.GoFile(path.Config("queue.go")).
 				Find(match.Config("queue.connections")).Modify(modify.RemoveConfig("redis")).
 				Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/queue"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")),
