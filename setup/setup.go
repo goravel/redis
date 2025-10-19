@@ -103,7 +103,7 @@ func main() {
 				modify.GoFile(cacheConfigPath).
 					Find(match.Config("cache.stores")).Modify(modify.RemoveConfig("redis")).
 					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/cache"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("cache")).Modify(modify.AddConfig("default", `""`)),
+					Find(match.Config("cache")).Modify(modify.AddConfig("default", `"memory"`)),
 			),
 
 			// Remove redis configuration from queue.go if queue config file exists
@@ -111,7 +111,7 @@ func main() {
 				modify.GoFile(queueConfigPath).
 					Find(match.Config("queue.connections")).Modify(modify.RemoveConfig("redis")).
 					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/queue"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("queue")).Modify(modify.AddConfig("default", `""`)),
+					Find(match.Config("queue")).Modify(modify.AddConfig("default", `"sync"`)),
 			),
 
 			// Remove redis configuration from session.go if session config file exists
@@ -119,7 +119,7 @@ func main() {
 				modify.GoFile(sessionConfigPath).
 					Find(match.Config("session.drivers")).Modify(modify.RemoveConfig("redis")).
 					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/session"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("session")).Modify(modify.AddConfig("default", `""`)),
+					Find(match.Config("session")).Modify(modify.AddConfig("default", `"file"`)),
 			),
 
 			// Remove redis configuration from database.go
