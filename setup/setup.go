@@ -103,7 +103,7 @@ func main() {
 				modify.GoFile(cacheConfigPath).
 					Find(match.Config("cache.stores")).Modify(modify.RemoveConfig("redis")).
 					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/cache"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("session")).Modify(modify.AddConfig("default", `""`)),
+					Find(match.Config("cache")).Modify(modify.AddConfig("default", `""`)),
 			),
 
 			// Remove redis configuration from queue.go if queue config file exists
