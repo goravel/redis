@@ -65,7 +65,7 @@ func main() {
 
 			// Add redis configuration to database.go
 			modify.GoFile(databaseConfigPath).
-				Find(match.Config("database")).Modify(modify.AddConfig("redis", databaseConfig)),
+				Find(match.Config("database")).Modify(modify.AddConfig("redis", databaseConfig, "// Redis connections")),
 
 			// Add redis cache configuration to cache.go if cache config file exists
 			modify.WhenFileExists(cacheConfigPath,
