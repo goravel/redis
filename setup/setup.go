@@ -53,6 +53,13 @@ func main() {
 	redisServiceProvider := "&redis.ServiceProvider{}"
 	modulePath := packages.GetModulePath()
 	moduleName := packages.GetModuleNameFromArgs(os.Args)
+	envPath := path.Base(".env")
+	envExamplePath := path.Base(".env.example")
+	env := `
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=
+REDIS_PORT=6379
+`
 
 	packages.Setup(os.Args).
 		Install(
@@ -91,6 +98,10 @@ func main() {
 					Find(match.Config("session.drivers")).Modify(modify.AddConfig("redis", sessionConfig)).
 					Find(match.Config("session")).Modify(modify.AddConfig("default", `"redis"`)),
 			),
+
+			// Add configurations to the .env and .env.example files
+			modify.WhenFileNotContains(envPath, "REDIS_HOST", modify.File(envPath).Append(env)),
+			modify.WhenFileNotContains(envExamplePath, "REDIS_HOST", modify.File(envExamplePath).Append(env)),
 		).
 		Uninstall(
 			// Remove redis service provider from app.go
