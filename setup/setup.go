@@ -6,6 +6,7 @@ import (
 	"github.com/goravel/framework/packages"
 	"github.com/goravel/framework/packages/match"
 	"github.com/goravel/framework/packages/modify"
+	"github.com/goravel/framework/support/file"
 	"github.com/goravel/framework/support/path"
 	supportstubs "github.com/goravel/framework/support/stubs"
 )
@@ -116,10 +117,17 @@ func main() {
 			),
 
 			// Remove redis configuration from database.go
-			modify.WhenFileExists(databaseConfigPath,
-				modify.GoFile(databaseConfigPath).
-					Find(match.Config("database")).Modify(modify.RemoveConfig("redis")),
-			),
+			modify.GoFile(databaseConfigPath).
+				Find(match.Config("database")).Modify(modify.RemoveConfig("redis")),
+
+			// Remove config/database.go
+			modify.When(func(_ map[string]any) bool {
+				content, err := file.GetContent(databaseConfigPath)
+				if err != nil {
+					return false
+				}
+				return content == supportstubs.DatabaseConfig(moduleName)
+			}, modify.File(databaseConfigPath).Remove()),
 		).
 		Execute()
 }
