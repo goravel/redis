@@ -51,6 +51,7 @@ func main() {
 	sessionConfigPath := path.Config("session.go")
 	redisServiceProvider := "&redis.ServiceProvider{}"
 	modulePath := packages.GetModulePath()
+	moduleName := packages.GetModuleNameFromArgs(os.Args)
 
 	packages.Setup(os.Args).
 		Install(
@@ -60,7 +61,7 @@ func main() {
 				Find(match.Providers()).Modify(modify.Register(redisServiceProvider)),
 
 			// Create config/database.go
-			modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(modulePath))),
+			modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(moduleName))),
 
 			// Add redis configuration to database.go
 			modify.GoFile(databaseConfigPath).
