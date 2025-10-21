@@ -25,7 +25,7 @@ type SessionTestSuite struct {
 	suite.Suite
 	mockConfig *mocksconfig.Config
 
-	client  *redis.Client
+	client  redis.UniversalClient
 	docker  *Docker
 	session *Session
 }
@@ -66,7 +66,7 @@ func (s *SessionTestSuite) TearDownSuite() {
 }
 
 func (s *SessionTestSuite) SetupTest() {
-	clients = make(map[string]*redis.Client)
+	clients = make(map[string]redis.UniversalClient)
 }
 
 func (s *SessionTestSuite) TestWrite() {

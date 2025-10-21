@@ -12,7 +12,7 @@ import (
 
 type ReservedJob struct {
 	ctx              context.Context
-	client           *redis.Client
+	client           redis.UniversalClient
 	jobRecord        JobRecord
 	jobRecordJson    string
 	jobStorer        contractsqueue.JobStorer
@@ -21,7 +21,7 @@ type ReservedJob struct {
 	reservedQueueKey string
 }
 
-func NewReservedJob(ctx context.Context, client *redis.Client, jobRecord JobRecord, jobStorer contractsqueue.JobStorer, json contractsfoundation.Json, reservedQueueKey string) (*ReservedJob, error) {
+func NewReservedJob(ctx context.Context, client redis.UniversalClient, jobRecord JobRecord, jobStorer contractsqueue.JobStorer, json contractsfoundation.Json, reservedQueueKey string) (*ReservedJob, error) {
 	task, err := utils.JsonToTask(jobRecord.Playload, jobStorer, json)
 	if err != nil {
 		return nil, err

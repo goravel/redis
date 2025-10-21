@@ -29,7 +29,7 @@ var _ contractsqueue.Driver = &Queue{}
 
 type Queue struct {
 	ctx       context.Context
-	client    *redis.Client
+	client    redis.UniversalClient
 	jobStorer contractsqueue.JobStorer
 	json      foundation.Json
 	queueKey  *QueueKey

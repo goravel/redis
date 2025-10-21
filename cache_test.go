@@ -49,7 +49,7 @@ func (s *CacheTestSuite) TearDownSuite() {
 }
 
 func (s *CacheTestSuite) SetupTest() {
-	clients = make(map[string]*redis.Client)
+	clients = make(map[string]redis.UniversalClient)
 }
 
 func (s *CacheTestSuite) TestAdd() {

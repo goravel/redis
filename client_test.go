@@ -40,7 +40,7 @@ func (s *ConnectionTestSuite) TearDownSuite() {
 }
 
 func (s *ConnectionTestSuite) SetupTest() {
-	clients = make(map[string]*redis.Client)
+	clients = make(map[string]redis.UniversalClient)
 }
 
 func (s *ConnectionTestSuite) TestCreateClient() {

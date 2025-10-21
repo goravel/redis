@@ -106,14 +106,14 @@ func (r *Docker) Shutdown() error {
 	return r.imageDriver.Shutdown()
 }
 
-func (r *Docker) connect() (*redis.Client, error) {
+func (r *Docker) connect() (redis.UniversalClient, error) {
 	var (
-		client *redis.Client
+		client redis.UniversalClient
 		err    error
 	)
 	for i := 0; i < 60; i++ {
-		client = redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", r.config.Host, r.config.Port),
+		client = redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    []string{fmt.Sprintf("%s:%d", r.config.Host, r.config.Port)},
 			Password: r.config.Password,
 			DB:       cast.ToInt(r.config.Database),
 		})
