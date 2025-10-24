@@ -50,6 +50,7 @@ func (s *ConnectionTestSuite) TestCreateClient() {
 		s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testConnection)).Return("").Once()
 		s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
 		s.mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(0).Once()
+		s.mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", testConnection), false).Return(false).Once()
 		s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testConnection)).Return(nil).Once()
 
 		client, err := createClient(s.mockConfig, testConnection)
@@ -74,6 +75,7 @@ func (s *ConnectionTestSuite) TestCreateClient() {
 		s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", connection)).Return("").Once()
 		s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", connection)).Return("").Once()
 		s.mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", connection), 0).Return(0).Once()
+		s.mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", connection), false).Return(false).Once()
 		s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", connection)).Return(nil).Once()
 
 		client, err := createClient(s.mockConfig, connection)
@@ -89,6 +91,7 @@ func (s *ConnectionTestSuite) TestGetClient() {
 	s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testConnection)).Return("").Once()
 	s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testConnection)).Return(testPassword).Once()
 	s.mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(0).Once()
+	s.mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", testConnection), false).Return(false).Once()
 	s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testConnection)).Return(nil).Once()
 
 	// First call should create the client
@@ -110,6 +113,7 @@ func (s *ConnectionTestSuite) TestGetClient() {
 	s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", connection)).Return("").Once()
 	s.mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", connection)).Return("").Once()
 	s.mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", connection), 0).Return(0).Once()
+	s.mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", connection), false).Return(false).Once()
 	s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", connection)).Return(nil).Once()
 
 	failedClient, err := getClient(s.mockConfig, connection)

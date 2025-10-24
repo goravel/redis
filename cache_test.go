@@ -442,5 +442,6 @@ func mockGetClient(mockConfig *mocksconfig.Config, docker *Docker) {
 	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.username", testConnection)).Return(docker.Config().Username).Once()
 	mockConfig.EXPECT().GetString(fmt.Sprintf("database.redis.%s.password", testConnection)).Return(docker.Config().Password).Once()
 	mockConfig.EXPECT().GetInt(fmt.Sprintf("database.redis.%s.database", testConnection), 0).Return(cast.ToInt(docker.Config().Database)).Once()
+	mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", testConnection), false).Return(false).Once()
 	mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testConnection)).Return(nil).Once()
 }

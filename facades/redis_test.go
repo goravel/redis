@@ -30,6 +30,7 @@ func TestMakingSessionWithRealImplementation(t *testing.T) {
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
 	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("GetBool", fmt.Sprintf("database.redis.%s.cluster", connectionName), false).Return(false).Once()
 	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
 
 	mockConfig.On("GetInt", "session.lifetime", 120).Return(120).Once()
@@ -76,6 +77,7 @@ func TestMakingCacheWithRealImplementation(t *testing.T) {
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
 	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("GetBool", fmt.Sprintf("database.redis.%s.cluster", connectionName), false).Return(false).Once()
 	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
 
 	mockConfig.On("GetString", "cache.prefix").Return("goravel_cache").Once()
@@ -114,6 +116,7 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.username", connectionName)).Return("").Once()
 	mockConfig.On("GetInt", fmt.Sprintf("database.redis.%s.database", connectionName), 0).Return(0).Once()
+	mockConfig.On("GetBool", fmt.Sprintf("database.redis.%s.cluster", connectionName), false).Return(false).Once()
 	mockConfig.On("Get", fmt.Sprintf("database.redis.%s.tls", connectionName)).Return(nil).Once()
 
 	originalApp := redis.App
