@@ -21,7 +21,7 @@ type Cache struct {
 	ctx      context.Context
 	config   config.Config
 	prefix   string
-	instance *redis.Client
+	instance redis.UniversalClient
 	store    string
 }
 

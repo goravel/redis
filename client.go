@@ -15,13 +15,13 @@ import (
 // Global map to store Redis client connections.
 // Keyed by the connection name defined in the config.
 var (
-	clients = make(map[string]*redis.Client)
+	clients = make(map[string]redis.UniversalClient)
 	mu      sync.RWMutex
 )
 
 // createClient initializes a new Redis client based on configuration.
 // It performs a PING check to ensure connectivity.
-func createClient(config config.Config, connection string) (*redis.Client, error) {
+func createClient(config config.Config, connection string) (redis.UniversalClient, error) {
 	configPrefix := fmt.Sprintf("database.redis.%s", connection)
 	host := config.GetString(fmt.Sprintf("%s.host", configPrefix))
 	if host == "" {
@@ -32,12 +32,14 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 	username := config.GetString(fmt.Sprintf("%s.username", configPrefix))
 	password := config.GetString(fmt.Sprintf("%s.password", configPrefix))
 	db := config.GetInt(fmt.Sprintf("%s.database", configPrefix), 0)
+	cluster := config.GetBool(fmt.Sprintf("%s.cluster", configPrefix), false)
 
-	options := &redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Username: username,
-		Password: password,
-		DB:       db,
+	options := &redis.UniversalOptions{
+		Addrs:         []string{fmt.Sprintf("%s:%s", host, port)},
+		Username:      username,
+		Password:      password,
+		DB:            db,
+		IsClusterMode: cluster,
 	}
 
 	tlsConfigRaw := config.Get(fmt.Sprintf("%s.tls", configPrefix))
@@ -45,7 +47,7 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 		options.TLSConfig = tlsConfig
 	}
 
-	client := redis.NewClient(options)
+	client := redis.NewUniversalClient(options)
 
 	// Verify the connection using PING with a timeout
 	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -67,7 +69,7 @@ func createClient(config config.Config, connection string) (*redis.Client, error
 // It uses a cached instance if one already exists for the name, otherwise,
 // it creates, caches, and returns a new one. It is thread-safe.
 // Returns an error if the client cannot be created or configured correctly.
-func getClient(config config.Config, connection string) (*redis.Client, error) {
+func getClient(config config.Config, connection string) (redis.UniversalClient, error) {
 	// 1. Fast path: Check if client exists with read lock (allows concurrent reads)
 	mu.RLock()
 	client, exists := clients[connection]

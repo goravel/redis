@@ -19,7 +19,7 @@ import (
 type ReservedJobTestSuite struct {
 	suite.Suite
 	ctx              context.Context
-	client           *redis.Client
+	client           redis.UniversalClient
 	mockJobStorer    *mocksqueue.JobStorer
 	docker           *Docker
 	reservedQueueKey string
@@ -55,7 +55,7 @@ func (s *ReservedJobTestSuite) TearDownSuite() {
 }
 
 func (s *ReservedJobTestSuite) SetupTest() {
-	clients = make(map[string]*redis.Client)
+	clients = make(map[string]redis.UniversalClient)
 }
 
 func (s *ReservedJobTestSuite) TestNewReservedJob() {

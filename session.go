@@ -18,7 +18,7 @@ type Session struct {
 	ctx             context.Context
 	config          config.Config
 	prefix          string
-	instance        *redis.Client
+	instance        redis.UniversalClient
 	lifetimeSeconds int
 }
 
