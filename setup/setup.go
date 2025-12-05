@@ -6,20 +6,21 @@ import (
 	"github.com/goravel/framework/packages"
 	"github.com/goravel/framework/packages/match"
 	"github.com/goravel/framework/packages/modify"
+	"github.com/goravel/framework/support/env"
 	"github.com/goravel/framework/support/file"
 	"github.com/goravel/framework/support/path"
 	supportstubs "github.com/goravel/framework/support/stubs"
 )
 
-var (
-	cacheConfig = `map[string]any{
+func main() {
+	cacheConfig := `map[string]any{
         "driver": "custom",
         "connection": "default",
         "via": func() (cache.Driver, error) {
             return redisfacades.Cache("redis") // The ` + "`redis`" + ` value is the key of ` + "`stores`" + `
         },
     }`
-	databaseConfig = `map[string]any{
+	databaseConfig := `map[string]any{
         "default": map[string]any{
             "host":     config.Env("REDIS_HOST", ""),
             "password": config.Env("REDIS_PASSWORD", ""),
@@ -27,7 +28,7 @@ var (
             "database": config.Env("REDIS_DB", 0),
         },
     }`
-	queueConfig = `map[string]any{
+	queueConfig := `map[string]any{
         "driver": "custom",
         "connection": "default",
         "queue": "default",
@@ -35,16 +36,14 @@ var (
             return redisfacades.Queue("redis") // The ` + "`redis`" + ` value is the key of ` + "`connections`" + `
         },
     }`
-	sessionConfig = `map[string]any{
+	sessionConfig := `map[string]any{
         "driver": "custom",
         "connection": "default",
         "via": func() (session.Driver, error) {
             return redisfacades.Session("redis")
         },
     }`
-)
 
-func main() {
 	appConfigPath := path.Config("app.go")
 	databaseConfigPath := path.Config("database.go")
 	cacheConfigPath := path.Config("cache.go")
@@ -55,7 +54,11 @@ func main() {
 	moduleName := packages.GetModuleNameFromArgs(os.Args)
 	envPath := path.Base(".env")
 	envExamplePath := path.Base(".env.example")
-	env := `
+	cacheContract := "github.com/goravel/framework/contracts/cache"
+	queueContract := "github.com/goravel/framework/contracts/queue"
+	sessionContract := "github.com/goravel/framework/contracts/session"
+	redisFacades := "github.com/goravel/redis/facades"
+	envContent := `
 REDIS_HOST=127.0.0.1
 REDIS_PASSWORD=
 REDIS_PORT=6379
@@ -63,10 +66,17 @@ REDIS_PORT=6379
 
 	packages.Setup(os.Args).
 		Install(
-			// Add redis service provider to app.go
-			modify.GoFile(appConfigPath).
+			// Add redis service provider to app.go if not using bootstrap setup
+			modify.When(func(_ map[string]any) bool {
+				return !env.IsBootstrapSetup()
+			}, modify.GoFile(appConfigPath).
 				Find(match.Imports()).Modify(modify.AddImport(modulePath)).
-				Find(match.Providers()).Modify(modify.Register(redisServiceProvider)),
+				Find(match.Providers()).Modify(modify.Register(redisServiceProvider))),
+
+			// Add redis service provider to providers.go if using bootstrap setup
+			modify.When(func(_ map[string]any) bool {
+				return env.IsBootstrapSetup()
+			}, modify.AddProviderApply(modulePath, redisServiceProvider)),
 
 			// Create config/database.go
 			modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(moduleName))),
@@ -78,7 +88,7 @@ REDIS_PORT=6379
 			// Add redis cache configuration to cache.go if cache config file exists
 			modify.WhenFileExists(cacheConfigPath,
 				modify.GoFile(cacheConfigPath).
-					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/cache"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Imports()).Modify(modify.AddImport(cacheContract), modify.AddImport(redisFacades, "redisfacades")).
 					Find(match.Config("cache.stores")).Modify(modify.AddConfig("redis", cacheConfig)).
 					Find(match.Config("cache")).Modify(modify.AddConfig("default", `"redis"`)),
 			),
@@ -86,7 +96,7 @@ REDIS_PORT=6379
 			// Add redis queue configuration to queue.go if queue config file exists
 			modify.WhenFileExists(queueConfigPath,
 				modify.GoFile(queueConfigPath).
-					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/queue"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Imports()).Modify(modify.AddImport(queueContract), modify.AddImport(redisFacades, "redisfacades")).
 					Find(match.Config("queue.connections")).Modify(modify.AddConfig("redis", queueConfig)).
 					Find(match.Config("queue")).Modify(modify.AddConfig("default", `"redis"`)),
 			),
@@ -94,43 +104,50 @@ REDIS_PORT=6379
 			// Add redis session configuration to session.go if session config file exists
 			modify.WhenFileExists(sessionConfigPath,
 				modify.GoFile(sessionConfigPath).
-					Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/session"), modify.AddImport("github.com/goravel/redis/facades", "redisfacades")).
+					Find(match.Imports()).Modify(modify.AddImport(sessionContract), modify.AddImport(redisFacades, "redisfacades")).
 					Find(match.Config("session.drivers")).Modify(modify.AddConfig("redis", sessionConfig)).
 					Find(match.Config("session")).Modify(modify.AddConfig("default", `"redis"`)),
 			),
 
 			// Add configurations to the .env and .env.example files
-			modify.WhenFileNotContains(envPath, "REDIS_HOST", modify.File(envPath).Append(env)),
-			modify.WhenFileNotContains(envExamplePath, "REDIS_HOST", modify.File(envExamplePath).Append(env)),
+			modify.WhenFileNotContains(envPath, "REDIS_HOST", modify.File(envPath).Append(envContent)),
+			modify.WhenFileNotContains(envExamplePath, "REDIS_HOST", modify.File(envExamplePath).Append(envContent)),
 		).
 		Uninstall(
-			// Remove redis service provider from app.go
-			modify.GoFile(appConfigPath).
+			// Remove redis service provider from app.go if not using bootstrap setup
+			modify.When(func(_ map[string]any) bool {
+				return !env.IsBootstrapSetup()
+			}, modify.GoFile(appConfigPath).
 				Find(match.Providers()).Modify(modify.Unregister(redisServiceProvider)).
-				Find(match.Imports()).Modify(modify.RemoveImport(modulePath)),
+				Find(match.Imports()).Modify(modify.RemoveImport(modulePath))),
+
+			// Remove redis service provider from providers.go if using bootstrap setup
+			modify.When(func(_ map[string]any) bool {
+				return env.IsBootstrapSetup()
+			}, modify.RemoveProviderApply(modulePath, redisServiceProvider)),
 
 			// Remove redis configuration from cache.go if cache config file exists
 			modify.WhenFileExists(cacheConfigPath,
 				modify.GoFile(cacheConfigPath).
+					Find(match.Config("cache")).Modify(modify.AddConfig("default", `"memory"`)).
 					Find(match.Config("cache.stores")).Modify(modify.RemoveConfig("redis")).
-					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/cache"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("cache")).Modify(modify.AddConfig("default", `"memory"`)),
+					Find(match.Imports()).Modify(modify.RemoveImport(cacheContract), modify.RemoveImport(redisFacades, "redisfacades")),
 			),
 
 			// Remove redis configuration from queue.go if queue config file exists
 			modify.WhenFileExists(queueConfigPath,
 				modify.GoFile(queueConfigPath).
+					Find(match.Config("queue")).Modify(modify.AddConfig("default", `"sync"`)).
 					Find(match.Config("queue.connections")).Modify(modify.RemoveConfig("redis")).
-					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/queue"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("queue")).Modify(modify.AddConfig("default", `"sync"`)),
+					Find(match.Imports()).Modify(modify.RemoveImport(queueContract), modify.RemoveImport(redisFacades, "redisfacades")),
 			),
 
 			// Remove redis configuration from session.go if session config file exists
 			modify.WhenFileExists(sessionConfigPath,
 				modify.GoFile(sessionConfigPath).
+					Find(match.Config("session")).Modify(modify.AddConfig("default", `"file"`)).
 					Find(match.Config("session.drivers")).Modify(modify.RemoveConfig("redis")).
-					Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/session"), modify.RemoveImport("github.com/goravel/redis/facades", "redisfacades")).
-					Find(match.Config("session")).Modify(modify.AddConfig("default", `"file"`)),
+					Find(match.Imports()).Modify(modify.RemoveImport(sessionContract), modify.RemoveImport(redisFacades, "redisfacades")),
 			),
 
 			// Remove redis configuration from database.go
