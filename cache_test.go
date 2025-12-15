@@ -9,7 +9,6 @@ import (
 
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	"github.com/goravel/framework/support/env"
-	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/suite"
 )
