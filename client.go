@@ -14,7 +14,10 @@ import (
 
 // Global map to store Redis client connections.
 // Keyed by the connection name defined in the config.
-var clients sync.Map
+var (
+	clients sync.Map
+	mu      sync.Mutex
+)
 
 // GetClient returns a Redis client for the specified connection name.
 // It uses a cached instance if one already exists for the name, otherwise,
@@ -26,6 +29,14 @@ func GetClient(config config.Config, connection string) (redis.UniversalClient, 
 		return client.(redis.UniversalClient), nil
 	}
 
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Another goroutine might have created the client while we were waiting for the lock.
+	if client, ok := clients.Load(connection); ok {
+		return client.(redis.UniversalClient), nil
+	}
+
 	// Create new client
 	newClient, err := createClient(config, connection)
 	if err != nil {
@@ -33,13 +44,7 @@ func GetClient(config config.Config, connection string) (redis.UniversalClient, 
 	}
 
 	if newClient != nil {
-		// Use LoadOrStore to avoid duplicate creation
-		actual, loaded := clients.LoadOrStore(connection, newClient)
-		if loaded {
-			// Another goroutine already created the client, close ours
-			_ = newClient.Close()
-			return actual.(redis.UniversalClient), nil
-		}
+		clients.Store(connection, newClient)
 	}
 
 	return newClient, nil

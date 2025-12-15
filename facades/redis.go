@@ -47,7 +47,7 @@ func Session(driver string) (session.Driver, error) {
 		return nil, redis.ErrRedisServiceProviderNotRegistered
 	}
 	if driver == "" {
-		return nil, redis.ErrRedisConnectionIsRequired
+		return nil, redis.ErrSessionDriverIsRequired
 	}
 
 	instance, err := redis.App.MakeWith(redis.BindingSession, map[string]any{"driver": driver})
@@ -61,6 +61,12 @@ func Session(driver string) (session.Driver, error) {
 // Instance returns a Redis client instance for the specified connection name.
 // This might be useful for some advanced usages.
 func Instance(connection string) (goredis.UniversalClient, error) {
-	config := redis.App.MakeConfig()
-	return redis.GetClient(config, connection)
+	if redis.App == nil {
+		return nil, redis.ErrRedisServiceProviderNotRegistered
+	}
+	if connection == "" {
+		return nil, redis.ErrRedisConnectionIsRequired
+	}
+
+	return redis.GetClient(redis.App.MakeConfig(), connection)
 }
