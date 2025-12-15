@@ -50,7 +50,6 @@ func (r *ServiceProvider) Register(app foundation.Application) {
 
 		return NewCache(context.Background(), config, parameters["store"].(string))
 	})
-
 	app.BindWith(BindingQueue, func(app foundation.Application, parameters map[string]any) (any, error) {
 		config := app.MakeConfig()
 		if config == nil {

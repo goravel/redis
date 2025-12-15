@@ -5,6 +5,8 @@ import (
 	"github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/contracts/session"
 
+	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/goravel/redis"
 )
 
@@ -54,4 +56,11 @@ func Session(driver string) (session.Driver, error) {
 	}
 
 	return instance.(*redis.Session), nil
+}
+
+// Instance returns a Redis client instance for the specified connection name.
+// This might be useful for some advanced usages.
+func Instance(connection string) (goredis.UniversalClient, error) {
+	config := redis.App.MakeConfig()
+	return redis.GetClient(config, connection)
 }

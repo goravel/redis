@@ -14,10 +14,36 @@ import (
 
 // Global map to store Redis client connections.
 // Keyed by the connection name defined in the config.
-var (
-	clients = make(map[string]redis.UniversalClient)
-	mu      sync.RWMutex
-)
+var clients sync.Map
+
+// GetClient returns a Redis client for the specified connection name.
+// It uses a cached instance if one already exists for the name, otherwise,
+// it creates, caches, and returns a new one. It is thread-safe.
+// Returns an error if the client cannot be created or configured correctly.
+func GetClient(config config.Config, connection string) (redis.UniversalClient, error) {
+	// Try to load existing client from sync.Map
+	if client, ok := clients.Load(connection); ok {
+		return client.(redis.UniversalClient), nil
+	}
+
+	// Create new client
+	newClient, err := createClient(config, connection)
+	if err != nil {
+		return nil, err
+	}
+
+	if newClient != nil {
+		// Use LoadOrStore to avoid duplicate creation
+		actual, loaded := clients.LoadOrStore(connection, newClient)
+		if loaded {
+			// Another goroutine already created the client, close ours
+			_ = newClient.Close()
+			return actual.(redis.UniversalClient), nil
+		}
+	}
+
+	return newClient, nil
+}
 
 // createClient initializes a new Redis client based on configuration.
 // It performs a PING check to ensure connectivity.
@@ -63,42 +89,4 @@ func createClient(config config.Config, connection string) (redis.UniversalClien
 	}
 
 	return client, nil
-}
-
-// getClient returns a Redis client for the specified connection name.
-// It uses a cached instance if one already exists for the name, otherwise,
-// it creates, caches, and returns a new one. It is thread-safe.
-// Returns an error if the client cannot be created or configured correctly.
-func getClient(config config.Config, connection string) (redis.UniversalClient, error) {
-	// 1. Fast path: Check if client exists with read lock (allows concurrent reads)
-	mu.RLock()
-	client, exists := clients[connection]
-	mu.RUnlock()
-
-	if exists {
-		return client, nil
-	}
-
-	// 2. Slow path: Acquire write lock to create the client
-	mu.Lock()
-	defer mu.Unlock()
-
-	// 3. Double check: Another goroutine might have created the client
-	//    while we were waiting for the write lock.
-	client, exists = clients[connection]
-	if exists {
-		return client, nil
-	}
-
-	// 4. Create the new client
-	newClient, err := createClient(config, connection)
-	if err != nil {
-		return nil, err
-	}
-
-	if newClient != nil {
-		clients[connection] = newClient
-	}
-
-	return newClient, nil
 }

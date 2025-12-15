@@ -6,7 +6,6 @@ import (
 
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	"github.com/goravel/framework/support/env"
-	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/suite"
 )
@@ -39,9 +38,7 @@ func (s *ConnectionTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *ConnectionTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
-}
+func (s *ConnectionTestSuite) SetupTest() {}
 
 func (s *ConnectionTestSuite) TestCreateClient() {
 	s.Run("happy path", func() {
@@ -95,12 +92,12 @@ func (s *ConnectionTestSuite) TestGetClient() {
 	s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", testConnection)).Return(nil).Once()
 
 	// First call should create the client
-	client, err := getClient(s.mockConfig, testConnection)
+	client, err := GetClient(s.mockConfig, testConnection)
 	s.Nil(err)
 	s.NotNil(client)
 
 	// Second call should return the same instance (no more config calls expected)
-	client2, err := getClient(s.mockConfig, testConnection)
+	client2, err := GetClient(s.mockConfig, testConnection)
 	s.Nil(err)
 	s.NotNil(client2)
 	s.Equal(client, client2)
@@ -116,7 +113,7 @@ func (s *ConnectionTestSuite) TestGetClient() {
 	s.mockConfig.EXPECT().GetBool(fmt.Sprintf("database.redis.%s.cluster", connection), false).Return(false).Once()
 	s.mockConfig.EXPECT().Get(fmt.Sprintf("database.redis.%s.tls", connection)).Return(nil).Once()
 
-	failedClient, err := getClient(s.mockConfig, connection)
+	failedClient, err := GetClient(s.mockConfig, connection)
 	s.NoError(err)
 	s.Nil(failedClient)
 }
