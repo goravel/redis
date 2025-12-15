@@ -38,7 +38,9 @@ func (s *ConnectionTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *ConnectionTestSuite) SetupTest() {}
+func (s *ConnectionTestSuite) SetupTest() {
+	clients.Clear()
+}
 
 func (s *ConnectionTestSuite) TestCreateClient() {
 	s.Run("happy path", func() {

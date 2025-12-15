@@ -65,7 +65,9 @@ func (s *SessionTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *SessionTestSuite) SetupTest() {}
+func (s *SessionTestSuite) SetupTest() {
+	clients.Clear()
+}
 
 func (s *SessionTestSuite) TestWrite() {
 	testID := "write_session_id"

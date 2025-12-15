@@ -54,7 +54,9 @@ func (s *ReservedJobTestSuite) TearDownSuite() {
 	carbon.ClearTestNow()
 }
 
-func (s *ReservedJobTestSuite) SetupTest() {}
+func (s *ReservedJobTestSuite) SetupTest() {
+	clients.Clear()
+}
 
 func (s *ReservedJobTestSuite) TestNewReservedJob() {
 	jobRecord := JobRecord{

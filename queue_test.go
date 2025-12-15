@@ -63,7 +63,9 @@ func (s *QueueTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *QueueTestSuite) SetupTest() {}
+func (s *QueueTestSuite) SetupTest() {
+	clients.Clear()
+}
 
 func (s *QueueTestSuite) Test_Driver() {
 	s.Equal("custom", s.queue.Driver())
