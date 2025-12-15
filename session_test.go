@@ -65,9 +65,7 @@ func (s *SessionTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *SessionTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
-}
+func (s *SessionTestSuite) SetupTest() {}
 
 func (s *SessionTestSuite) TestWrite() {
 	testID := "write_session_id"

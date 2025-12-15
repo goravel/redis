@@ -54,9 +54,7 @@ func (s *ReservedJobTestSuite) TearDownSuite() {
 	carbon.ClearTestNow()
 }
 
-func (s *ReservedJobTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
-}
+func (s *ReservedJobTestSuite) SetupTest() {}
 
 func (s *ReservedJobTestSuite) TestNewReservedJob() {
 	jobRecord := JobRecord{

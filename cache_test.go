@@ -48,9 +48,7 @@ func (s *CacheTestSuite) TearDownSuite() {
 	s.NoError(s.docker.Shutdown())
 }
 
-func (s *CacheTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
-}
+func (s *CacheTestSuite) SetupTest() {}
 
 func (s *CacheTestSuite) TestAdd() {
 	s.Nil(s.cache.Put("name", "Goravel", 1*time.Second))
