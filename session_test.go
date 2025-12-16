@@ -66,7 +66,7 @@ func (s *SessionTestSuite) TearDownSuite() {
 }
 
 func (s *SessionTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
+	clients.Clear()
 }
 
 func (s *SessionTestSuite) TestWrite() {

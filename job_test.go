@@ -55,7 +55,7 @@ func (s *ReservedJobTestSuite) TearDownSuite() {
 }
 
 func (s *ReservedJobTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
+	clients.Clear()
 }
 
 func (s *ReservedJobTestSuite) TestNewReservedJob() {

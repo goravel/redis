@@ -64,7 +64,7 @@ func (s *QueueTestSuite) TearDownSuite() {
 }
 
 func (s *QueueTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
+	clients.Clear()
 }
 
 func (s *QueueTestSuite) Test_Driver() {

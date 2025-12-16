@@ -37,7 +37,7 @@ type Queue struct {
 
 func NewQueue(ctx context.Context, config config.Config, queue contractsqueue.Queue, json foundation.Json, connection string) (*Queue, error) {
 	clientConnection := config.GetString(fmt.Sprintf("queue.connections.%s.connection", connection), "default")
-	client, err := getClient(config, clientConnection)
+	client, err := GetClient(config, clientConnection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}

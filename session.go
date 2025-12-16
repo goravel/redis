@@ -27,7 +27,7 @@ func NewSession(ctx context.Context, config config.Config, driver string) (*Sess
 
 	connection := config.GetString(fmt.Sprintf("session.drivers.%s.connection", driver), "default")
 
-	client, err := getClient(config, connection)
+	client, err := GetClient(config, connection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}

@@ -9,7 +9,6 @@ import (
 
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	"github.com/goravel/framework/support/env"
-	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/suite"
 )
@@ -49,7 +48,7 @@ func (s *CacheTestSuite) TearDownSuite() {
 }
 
 func (s *CacheTestSuite) SetupTest() {
-	clients = make(map[string]redis.UniversalClient)
+	clients.Clear()
 }
 
 func (s *CacheTestSuite) TestAdd() {

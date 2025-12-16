@@ -28,7 +28,7 @@ type Cache struct {
 func NewCache(ctx context.Context, config config.Config, store string) (*Cache, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
 
-	client, err := getClient(config, connection)
+	client, err := GetClient(config, connection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init redis client: %w", err)
 	}
