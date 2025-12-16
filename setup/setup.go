@@ -54,6 +54,7 @@ func main() {
 	moduleImport := setup.Paths().Module().Import()
 	configPackage := setup.Paths().Config().Package()
 	facadesImport := setup.Paths().Facades().Import()
+	facadesPackage := setup.Paths().Facades().Package()
 	envPath := path.Base(".env")
 	envExamplePath := path.Base(".env.example")
 	cacheContract := "github.com/goravel/framework/contracts/cache"
@@ -80,7 +81,7 @@ REDIS_PORT=6379
 		}, modify.AddProviderApply(moduleImport, redisServiceProvider)),
 
 		// Create config/database.go
-		modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(configPackage, facadesImport))),
+		modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(configPackage, facadesImport, facadesPackage))),
 
 		// Add redis configuration to database.go
 		modify.GoFile(databaseConfigPath).
@@ -160,7 +161,7 @@ REDIS_PORT=6379
 			if err != nil {
 				return false
 			}
-			return content == supportstubs.DatabaseConfig(configPackage, facadesImport)
+			return content == supportstubs.DatabaseConfig(configPackage, facadesImport, facadesPackage)
 		}, modify.File(databaseConfigPath).Remove()),
 	).Execute()
 }
