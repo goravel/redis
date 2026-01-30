@@ -7,6 +7,7 @@ import (
 	"time"
 
 	contractsconfig "github.com/goravel/framework/contracts/config"
+	contractsprocess "github.com/goravel/framework/contracts/process"
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
 	supportdocker "github.com/goravel/framework/support/docker"
 	testingdocker "github.com/goravel/framework/testing/docker"
@@ -15,11 +16,14 @@ import (
 )
 
 type Docker struct {
-	config      contractsdocker.CacheConfig
+	config      contractsconfig.Config
+	cacheConfig contractsdocker.CacheConfig
 	imageDriver contractsdocker.ImageDriver
+	process     contractsprocess.Process
+	connection  string
 }
 
-func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
+func NewDocker(config contractsconfig.Config, process contractsprocess.Process, store string) (*Docker, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store))
 	configPrefix := fmt.Sprintf("database.redis.%s", connection)
 	host := config.GetString(fmt.Sprintf("%s.host", configPrefix))
@@ -37,7 +41,9 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 	}
 
 	return &Docker{
-		config: contractsdocker.CacheConfig{
+		connection: connection,
+		config:     config,
+		cacheConfig: contractsdocker.CacheConfig{
 			Database: strconv.Itoa(database),
 			Host:     host,
 			Password: password,
@@ -49,7 +55,8 @@ func NewDocker(config contractsconfig.Config, store string) (*Docker, error) {
 			Tag:          "latest",
 			ExposedPorts: []string{"6379"},
 			Args:         args,
-		}),
+		}, process),
+		process: process,
 	}, nil
 }
 
@@ -59,14 +66,14 @@ func (r *Docker) Build() error {
 	}
 
 	config := r.imageDriver.Config()
-	r.config.ContainerID = config.ContainerID
-	r.config.Port = cast.ToInt(supportdocker.ExposedPort(config.ExposedPorts, strconv.Itoa(r.config.Port)))
+	r.cacheConfig.ContainerID = config.ContainerID
+	r.cacheConfig.Port = cast.ToInt(supportdocker.ExposedPort(config.ExposedPorts, strconv.Itoa(r.cacheConfig.Port)))
 
 	return nil
 }
 
 func (r *Docker) Config() contractsdocker.CacheConfig {
-	return r.config
+	return r.cacheConfig
 }
 
 func (r *Docker) Fresh() error {
@@ -83,7 +90,7 @@ func (r *Docker) Fresh() error {
 }
 
 func (r *Docker) Image(image contractsdocker.Image) {
-	r.imageDriver = testingdocker.NewImageDriver(image)
+	r.imageDriver = testingdocker.NewImageDriver(image, r.process)
 }
 
 func (r *Docker) Ready() error {
@@ -92,12 +99,14 @@ func (r *Docker) Ready() error {
 		return fmt.Errorf("connect Redis docker error: %v", err)
 	}
 
+	r.resetConfigPort()
+
 	return client.Close()
 }
 
 func (r *Docker) Reuse(containerID string, port int) error {
-	r.config.ContainerID = containerID
-	r.config.Port = port
+	r.cacheConfig.ContainerID = containerID
+	r.cacheConfig.Port = port
 
 	return nil
 }
@@ -111,11 +120,12 @@ func (r *Docker) connect() (redis.UniversalClient, error) {
 		client redis.UniversalClient
 		err    error
 	)
+
 	for i := 0; i < 60; i++ {
 		client = redis.NewUniversalClient(&redis.UniversalOptions{
-			Addrs:    []string{fmt.Sprintf("%s:%d", r.config.Host, r.config.Port)},
-			Password: r.config.Password,
-			DB:       cast.ToInt(r.config.Database),
+			Addrs:    []string{fmt.Sprintf("%s:%d", r.cacheConfig.Host, r.cacheConfig.Port)},
+			Password: r.cacheConfig.Password,
+			DB:       cast.ToInt(r.cacheConfig.Database),
 		})
 
 		if _, err = client.Ping(context.Background()).Result(); err == nil {
@@ -126,4 +136,8 @@ func (r *Docker) connect() (redis.UniversalClient, error) {
 	}
 
 	return client, err
+}
+
+func (r *Docker) resetConfigPort() {
+	r.config.Add(fmt.Sprintf("database.redis.%s.port", r.connection), r.cacheConfig.Port)
 }

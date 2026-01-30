@@ -9,6 +9,7 @@ import (
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	mocksfoundation "github.com/goravel/framework/mocks/foundation"
 	mocksqueue "github.com/goravel/framework/mocks/queue"
+	"github.com/goravel/framework/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -88,7 +89,7 @@ func TestMakingCacheWithRealImplementation(t *testing.T) {
 	}()
 	redis.App = mockApp
 
-	realCacheInstance, err := redis.NewCache(context.Background(), mockConfig, connectionName)
+	realCacheInstance, err := redis.NewCache(context.Background(), mockConfig, process.New(), connectionName)
 	if err != nil {
 		t.Skip("Skipping test as real driver creation failed:", err)
 		return
