@@ -48,7 +48,7 @@ func (r *ServiceProvider) Register(app foundation.Application) {
 			return nil, errors.ConfigFacadeNotSet.SetModule(errors.ModuleCache)
 		}
 
-		return NewCache(context.Background(), config, parameters["store"].(string))
+		return NewCache(context.Background(), config, app.MakeProcess(), parameters["store"].(string))
 	})
 	app.BindWith(BindingQueue, func(app foundation.Application, parameters map[string]any) (any, error) {
 		config := app.MakeConfig()

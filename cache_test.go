@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mocksconfig "github.com/goravel/framework/mocks/config"
+	"github.com/goravel/framework/process"
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/suite"
@@ -36,7 +37,7 @@ func (s *CacheTestSuite) SetupSuite() {
 	mockConfig.EXPECT().GetString(fmt.Sprintf("cache.stores.%s.connection", testStore), "default").Return(testConnection).Once()
 	mockConfig.EXPECT().GetString("cache.prefix").Return("goravel_cache").Once()
 
-	store, err := NewCache(context.Background(), mockConfig, testStore)
+	store, err := NewCache(context.Background(), mockConfig, process.New(), testStore)
 	s.Require().NoError(err)
 
 	s.cache = store

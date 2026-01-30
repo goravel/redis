@@ -10,7 +10,9 @@ import (
 	contractscache "github.com/goravel/framework/contracts/cache"
 	"github.com/goravel/framework/contracts/config"
 	contractshttp "github.com/goravel/framework/contracts/http"
+	"github.com/goravel/framework/contracts/process"
 	contractsdocker "github.com/goravel/framework/contracts/testing/docker"
+	"github.com/goravel/framework/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 )
@@ -20,12 +22,13 @@ var _ contractscache.Driver = &Cache{}
 type Cache struct {
 	ctx      context.Context
 	config   config.Config
+	process  process.Process
 	prefix   string
 	instance redis.UniversalClient
 	store    string
 }
 
-func NewCache(ctx context.Context, config config.Config, store string) (*Cache, error) {
+func NewCache(ctx context.Context, config config.Config, process process.Process, store string) (*Cache, error) {
 	connection := config.GetString(fmt.Sprintf("cache.stores.%s.connection", store), "default")
 
 	client, err := GetClient(config, connection)
@@ -39,6 +42,7 @@ func NewCache(ctx context.Context, config config.Config, store string) (*Cache, 
 		instance: client,
 		store:    store,
 		config:   config,
+		process:  process,
 	}, nil
 }
 
@@ -61,7 +65,11 @@ func (r *Cache) Decrement(key string, value ...int64) (int64, error) {
 }
 
 func (r *Cache) Docker() (contractsdocker.CacheDriver, error) {
-	return NewDocker(r.config, r.store)
+	if r.process == nil {
+		return nil, errors.ProcessFacadeNotSet
+	}
+
+	return NewDocker(r.config, r.process, r.store)
 }
 
 // Forever Driver an item in the cache indefinitely.
@@ -256,7 +264,7 @@ func (r *Cache) WithContext(ctx context.Context) contractscache.Driver {
 		ctx = http.Context()
 	}
 
-	store, _ := NewCache(ctx, r.config, r.store)
+	store, _ := NewCache(ctx, r.config, r.process, r.store)
 
 	return store
 }

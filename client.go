@@ -66,11 +66,12 @@ func createClient(config config.Config, connection string) (redis.UniversalClien
 	cluster := config.GetBool(fmt.Sprintf("%s.cluster", configPrefix), false)
 
 	options := &redis.UniversalOptions{
-		Addrs:         []string{fmt.Sprintf("%s:%s", host, port)},
-		Username:      username,
-		Password:      password,
-		DB:            db,
-		IsClusterMode: cluster,
+		Addrs:           []string{fmt.Sprintf("%s:%s", host, port)},
+		Username:        username,
+		Password:        password,
+		DB:              db,
+		IsClusterMode:   cluster,
+		DisableIdentity: true,
 	}
 
 	tlsConfigRaw := config.Get(fmt.Sprintf("%s.tls", configPrefix))
