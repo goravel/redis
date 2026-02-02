@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.25.6
 
 require (
-	github.com/goravel/framework v1.16.1-0.20260130094642-7135899a236e
+	github.com/goravel/framework v1.16.1-0.20260202061217-60e5444dde33
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.11.1
@@ -51,9 +51,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pterm/pterm v0.12.82 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/samber/lo v1.52.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/urfave/cli/v3 v3.6.2 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
