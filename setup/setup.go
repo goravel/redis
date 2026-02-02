@@ -78,7 +78,7 @@ REDIS_PORT=6379
 		// Add redis service provider to providers.go if using bootstrap setup
 		modify.When(func(_ map[string]any) bool {
 			return env.IsBootstrapSetup()
-		}, modify.AddProviderApply(moduleImport, redisServiceProvider)),
+		}, modify.RegisterProvider(moduleImport, redisServiceProvider)),
 
 		// Create config/database.go
 		modify.WhenFileNotExists(databaseConfigPath, modify.File(databaseConfigPath).Overwrite(supportstubs.DatabaseConfig(configPackage, facadesImport, facadesPackage))),
@@ -125,7 +125,7 @@ REDIS_PORT=6379
 		// Remove redis service provider from providers.go if using bootstrap setup
 		modify.When(func(_ map[string]any) bool {
 			return env.IsBootstrapSetup()
-		}, modify.RemoveProviderApply(moduleImport, redisServiceProvider)),
+		}, modify.UnregisterProvider(moduleImport, redisServiceProvider)),
 
 		// Remove redis configuration from cache.go if cache config file exists
 		modify.WhenFileExists(cacheConfigPath,
