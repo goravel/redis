@@ -110,31 +110,31 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 	delayQueueKey := r.queueKey.Delayed(queue)
 	now := float64(carbon.Now().Timestamp())
 
+	// Lua script: atomically check score, remove from ZSET, and push to list only if ready
+	script := `
+		local delayed = KEYS[1]
+		local queue = KEYS[2]
+		local now = tonumber(ARGV[1])
+		local job = redis.call('ZRANGE', delayed, 0, 0, 'WITHSCORES')
+		if #job == 0 then
+			return 0
+		end
+		local score = tonumber(job[2])
+		if score > now then
+			return 0
+		end
+		redis.call('ZREM', delayed, job[1])
+		redis.call('RPUSH', queue, job[1])
+		return 1
+	`
+
 	for {
-		// Atomically pop the lowest score item
-		results, err := r.client.ZPopMin(r.ctx, delayQueueKey, 1).Result()
+		result, err := r.client.Eval(r.ctx, script, []string{delayQueueKey, queueKey}, now).Result()
 		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				break
-			}
 			return err
 		}
-		if len(results) == 0 {
+		if result.(int64) == 0 {
 			break
-		}
-
-		// Check if this job's time has come
-		if results[0].Score > now {
-			// Not ready yet, put it back
-			if err := r.client.ZAdd(r.ctx, delayQueueKey, results[0]).Err(); err != nil {
-				return err
-			}
-			break
-		}
-
-		// Move to the queue
-		if err := r.client.RPush(r.ctx, queueKey, results[0].Member).Err(); err != nil {
-			return err
 		}
 	}
 
