@@ -3,13 +3,13 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/foundation"
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
+	"github.com/goravel/framework/support/carbon"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -108,24 +108,34 @@ func (r *Queue) Push(task contractsqueue.Task, queue string) error {
 func (r *Queue) migrateDelayedJobs(queue string) error {
 	queueKey := r.queueKey.Queue(queue)
 	delayQueueKey := r.queueKey.Delayed(queue)
-	jobs, err := r.client.ZRangeByScoreWithScores(r.ctx, delayQueueKey, &redis.ZRangeBy{
-		Min:    "-inf",
-		Max:    strconv.FormatFloat(float64(time.Now().Unix()), 'f', -1, 64),
-		Offset: 0,
-		Count:  -1,
-	}).Result()
-	if err != nil {
-		return err
-	}
+	now := float64(carbon.Now().Timestamp())
 
-	pipe := r.client.TxPipeline()
-	for _, job := range jobs {
-		pipe.RPush(r.ctx, queueKey, job.Member)
-		pipe.ZRem(r.ctx, delayQueueKey, job.Member)
-	}
-	_, err = pipe.Exec(r.ctx)
-	if err != nil {
-		return err
+	for {
+		// Atomically pop the lowest score item
+		results, err := r.client.ZPopMin(r.ctx, delayQueueKey, 1).Result()
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				break
+			}
+			return err
+		}
+		if len(results) == 0 {
+			break
+		}
+
+		// Check if this job's time has come
+		if results[0].Score > now {
+			// Not ready yet, put it back
+			if err := r.client.ZAdd(r.ctx, delayQueueKey, results[0]).Err(); err != nil {
+				return err
+			}
+			break
+		}
+
+		// Move to the queue
+		if err := r.client.RPush(r.ctx, queueKey, results[0].Member).Err(); err != nil {
+			return err
+		}
 	}
 
 	return nil
