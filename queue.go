@@ -3,13 +3,13 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/goravel/framework/contracts/config"
 	"github.com/goravel/framework/contracts/foundation"
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/errors"
+	"github.com/goravel/framework/support/carbon"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -108,24 +108,34 @@ func (r *Queue) Push(task contractsqueue.Task, queue string) error {
 func (r *Queue) migrateDelayedJobs(queue string) error {
 	queueKey := r.queueKey.Queue(queue)
 	delayQueueKey := r.queueKey.Delayed(queue)
-	jobs, err := r.client.ZRangeByScoreWithScores(r.ctx, delayQueueKey, &redis.ZRangeBy{
-		Min:    "-inf",
-		Max:    strconv.FormatFloat(float64(time.Now().Unix()), 'f', -1, 64),
-		Offset: 0,
-		Count:  -1,
-	}).Result()
-	if err != nil {
-		return err
-	}
+	now := float64(carbon.Now().Timestamp())
 
-	pipe := r.client.TxPipeline()
-	for _, job := range jobs {
-		pipe.RPush(r.ctx, queueKey, job.Member)
-		pipe.ZRem(r.ctx, delayQueueKey, job.Member)
-	}
-	_, err = pipe.Exec(r.ctx)
-	if err != nil {
-		return err
+	// Lua script: atomically check score, remove from ZSET, and push to list only if ready
+	script := `
+		local delayed = KEYS[1]
+		local queue = KEYS[2]
+		local now = tonumber(ARGV[1])
+		local job = redis.call('ZRANGE', delayed, 0, 0, 'WITHSCORES')
+		if #job == 0 then
+			return 0
+		end
+		local score = tonumber(job[2])
+		if score > now then
+			return 0
+		end
+		redis.call('ZREM', delayed, job[1])
+		redis.call('RPUSH', queue, job[1])
+		return 1
+	`
+
+	for {
+		result, err := r.client.Eval(r.ctx, script, []string{delayQueueKey, queueKey}, now).Result()
+		if err != nil {
+			return err
+		}
+		if result.(int64) == 0 {
+			break
+		}
 	}
 
 	return nil
