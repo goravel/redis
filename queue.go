@@ -11,6 +11,7 @@ import (
 	"github.com/goravel/framework/errors"
 	"github.com/goravel/framework/support/carbon"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
 )
 
 type Task struct {
@@ -133,7 +134,7 @@ func (r *Queue) migrateDelayedJobs(queue string) error {
 		if err != nil {
 			return err
 		}
-		if result.(int64) == 0 {
+		if cast.ToInt64(result) == 0 {
 			break
 		}
 	}
