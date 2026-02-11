@@ -203,6 +203,79 @@ func (s *QueueTestSuite) TestPop() {
 		s.NoError(err)
 		s.Equal(int64(0), count)
 	})
+
+	s.Run("concurrent pop with delayed job", func() {
+		queue := "concurrent-delay"
+		task := contractsqueue.Task{
+			UUID: "concurrent-test-uuid",
+			ChainJob: contractsqueue.ChainJob{
+				Job:   &MockJob{},
+				Args:  testArgs,
+				Delay: time.Now().Add(1 * time.Second),
+			},
+		}
+
+		// Push a delayed job
+		s.NoError(s.queue.Push(task, queue))
+
+		// Wait for the delay to pass
+		time.Sleep(1100 * time.Millisecond)
+
+		// Setup expectations for exactly one successful job retrieval
+		s.mockJobStorer.EXPECT().Get(task.Job.Signature()).Return(&MockJob{}, nil).Once()
+
+		// Simulate concurrent Pop calls
+		concurrency := 5
+		results := make(chan contractsqueue.ReservedJob, concurrency)
+		errs := make(chan error, concurrency)
+
+		for i := 0; i < concurrency; i++ {
+			go func() {
+				job, err := s.queue.Pop(queue)
+				if err != nil {
+					errs <- err
+				} else {
+					results <- job
+				}
+			}()
+		}
+
+		// Collect results
+		var successCount int
+		var noJobCount int
+		timeout := time.After(2 * time.Second)
+
+		for i := 0; i < concurrency; i++ {
+			select {
+			case job := <-results:
+				successCount++
+				s.NotNil(job)
+				s.Equal(task.Job.Signature(), job.Task().Job.Signature())
+			case err := <-errs:
+				if errors.Is(err, errors.QueueDriverNoJobFound) {
+					noJobCount++
+				} else {
+					s.Fail("unexpected error: %v", err)
+				}
+			case <-timeout:
+				s.Fail("timeout waiting for Pop results")
+			}
+		}
+
+		// Only one goroutine should have successfully retrieved the job
+		s.Equal(1, successCount, "expected exactly one successful Pop")
+		s.Equal(4, noJobCount, "expected four 'no job found' errors")
+
+		// Verify the queue is empty
+		count, err := s.queue.client.LLen(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
+
+		// Verify the delayed queue is empty
+		delayedCount, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Delayed(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), delayedCount)
+	})
 }
 
 func (s *QueueTestSuite) Test_Later() {
@@ -258,22 +331,93 @@ func (s *QueueTestSuite) Test_Later() {
 }
 
 func (s *QueueTestSuite) Test_migrateDelayedJobs() {
-	// Add a delayed job
-	queue := "test-queue"
-	delay := time.Now().Add(-1 * time.Hour) // Past time
-	payload := "test-payload"
-	s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
-		Score:  float64(delay.Unix()),
-		Member: payload,
+	s.Run("migrate ready job", func() {
+		queue := "test-queue-migrate"
+		delay := time.Now().Add(-1 * time.Hour) // Past time
+		payload := "test-payload"
+		s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
+			Score:  float64(delay.Unix()),
+			Member: payload,
+		})
+
+		err := s.queue.migrateDelayedJobs(queue)
+		s.Nil(err)
+
+		// Verify the job was moved to the main queue
+		result, err := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.Nil(err)
+		s.Equal(payload, result)
+
+		// Verify delayed queue is empty
+		count, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Delayed(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
 	})
 
-	err := s.queue.migrateDelayedJobs("test-queue")
-	s.Nil(err)
+	s.Run("do not migrate future job", func() {
+		queue := "test-queue-future"
+		delay := time.Now().Add(1 * time.Hour) // Future time
+		payload := "future-payload"
+		s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
+			Score:  float64(delay.Unix()),
+			Member: payload,
+		})
 
-	// Verify the job was moved to the main queue
-	result, err := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
-	s.Nil(err)
-	s.Equal(payload, result)
+		err := s.queue.migrateDelayedJobs(queue)
+		s.Nil(err)
+
+		// Verify the job is still in the delayed queue
+		count, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Delayed(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		// Verify main queue is empty
+		mainCount, err := s.queue.client.LLen(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.NoError(err)
+		s.Equal(int64(0), mainCount)
+	})
+
+	s.Run("migrate multiple jobs in order", func() {
+		queue := "test-queue-multiple"
+		payload1 := "payload-1"
+		payload2 := "payload-2"
+		payload3 := "payload-3"
+
+		// Add jobs with different delays (all in the past)
+		s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
+			Score:  float64(time.Now().Add(-3 * time.Hour).Unix()),
+			Member: payload1,
+		})
+		s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
+			Score:  float64(time.Now().Add(-2 * time.Hour).Unix()),
+			Member: payload2,
+		})
+		s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Delayed(queue), redis.Z{
+			Score:  float64(time.Now().Add(-1 * time.Hour).Unix()),
+			Member: payload3,
+		})
+
+		err := s.queue.migrateDelayedJobs(queue)
+		s.Nil(err)
+
+		// Verify all jobs were migrated
+		count, err := s.queue.client.LLen(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.NoError(err)
+		s.Equal(int64(3), count)
+
+		// Verify delayed queue is empty
+		delayedCount, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Delayed(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), delayedCount)
+
+		// Verify order: oldest first
+		result1, _ := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		result2, _ := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		result3, _ := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.Equal(payload1, result1)
+		s.Equal(payload2, result2)
+		s.Equal(payload3, result3)
+	})
 }
 
 func TestQueueKey(t *testing.T) {
