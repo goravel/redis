@@ -38,7 +38,7 @@ func NewCache(ctx context.Context, config config.Config, process process.Process
 
 	return &Cache{
 		ctx:      ctx,
-		prefix:   fmt.Sprintf("%s:", config.GetString("cache.prefix")),
+		prefix:   config.GetString("cache.prefix"),
 		instance: client,
 		store:    store,
 		config:   config,
@@ -270,5 +270,9 @@ func (r *Cache) WithContext(ctx context.Context) contractscache.Driver {
 }
 
 func (r *Cache) key(key string) string {
-	return r.prefix + key
+	if r.prefix == "" {
+		return key
+	}
+
+	return r.prefix + ":" + key
 }
