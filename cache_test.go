@@ -11,6 +11,7 @@ import (
 	"github.com/goravel/framework/process"
 	"github.com/goravel/framework/support/env"
 	"github.com/spf13/cast"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -434,6 +435,25 @@ func (s *CacheTestSuite) TestRememberForever() {
 	s.Nil(err)
 	s.Equal("World1", value)
 	s.True(s.cache.Flush())
+}
+
+func TestCacheKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+		key    string
+		want   string
+	}{
+		{name: "with prefix", prefix: "goravel_cache", key: "name", want: "goravel_cache:name"},
+		{name: "empty prefix is ignored", prefix: "", key: "name", want: "name"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cache := &Cache{prefix: test.prefix}
+			assert.Equal(t, test.want, cache.key(test.key))
+		})
+	}
 }
 
 func mockGetClient(mockConfig *mocksconfig.Config, docker *Docker) {
