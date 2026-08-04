@@ -33,6 +33,7 @@ func main() {
         "driver": "custom",
         "connection": "default",
         "queue": "default",
+        "retry_after": config.Env("REDIS_QUEUE_RETRY_AFTER", 60),
         "via": func() (queue.Driver, error) {
             return redisfacades.Queue("redis") // The ` + "`redis`" + ` value is the key of ` + "`connections`" + `
         },
@@ -65,6 +66,7 @@ func main() {
 REDIS_HOST=127.0.0.1
 REDIS_PASSWORD=
 REDIS_PORT=6379
+REDIS_QUEUE_RETRY_AFTER=60
 `
 
 	setup.Install(

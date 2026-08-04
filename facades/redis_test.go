@@ -112,6 +112,7 @@ func TestMakingQueueWithRealImplementation(t *testing.T) {
 	mockConfig := mocksconfig.NewConfig(t)
 	mockConfig.EXPECT().GetString("app.name", "goravel").Return("goravel").Once()
 	mockConfig.On("GetString", fmt.Sprintf("queue.connections.%s.connection", connectionName), "default").Return(connectionName).Once()
+	mockConfig.On("GetInt", fmt.Sprintf("queue.connections.%s.retry_after", connectionName), 60).Return(60).Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.host", connectionName)).Return("localhost").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.port", connectionName), "6379").Return("6379").Once()
 	mockConfig.On("GetString", fmt.Sprintf("database.redis.%s.password", connectionName)).Return("").Once()

@@ -44,6 +44,9 @@ func (s *QueueTestSuite) SetupSuite() {
 
 	mockConfig.EXPECT().GetString("app.name", "goravel").Return("test").Once()
 	mockConfig.EXPECT().GetString(fmt.Sprintf("queue.connections.%s.connection", testConnection), "default").Return(testConnection).Once()
+	mockConfig.EXPECT().GetInt(
+		fmt.Sprintf("queue.connections.%s.retry_after", testConnection), 60,
+	).Return(60).Once()
 
 	mockQueue := mocksqueue.NewQueue(s.T())
 	s.mockJobStorer = mocksqueue.NewJobStorer(s.T())
@@ -418,6 +421,153 @@ func (s *QueueTestSuite) Test_migrateDelayedJobs() {
 		s.Equal(payload2, result2)
 		s.Equal(payload3, result3)
 	})
+}
+
+func (s *QueueTestSuite) Test_migrateExpiredReservedJobs() {
+	s.Run("migrate expired reserved job", func() {
+		queue := "test-queue-expired"
+		payload := "test-payload"
+
+		// Seed a reservation older than retry_after
+		s.NoError(s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Reserved(queue), redis.Z{
+			Score:  float64(carbon.Now().Timestamp() - int64(s.queue.retryAfter) - 1),
+			Member: payload,
+		}).Err())
+
+		err := s.queue.migrateExpiredReservedJobs(queue)
+		s.NoError(err)
+
+		// Verify the job was moved back to the ready queue
+		result, err := s.queue.client.LPop(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.NoError(err)
+		s.Equal(payload, result)
+
+		// Verify the reserved queue is empty
+		count, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Reserved(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
+	})
+
+	s.Run("do not migrate fresh reservation", func() {
+		queue := "test-queue-fresh"
+		payload := "fresh-payload"
+
+		// Seed a fresh reservation (future score)
+		s.NoError(s.queue.client.ZAdd(context.Background(), s.queue.queueKey.Reserved(queue), redis.Z{
+			Score:  float64(carbon.Now().Timestamp() + 3600),
+			Member: payload,
+		}).Err())
+
+		err := s.queue.migrateExpiredReservedJobs(queue)
+		s.NoError(err)
+
+		// Verify the job is still in the reserved queue
+		count, err := s.queue.client.ZCount(context.Background(), s.queue.queueKey.Reserved(queue), "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		// Verify the ready queue is empty
+		mainCount, err := s.queue.client.LLen(context.Background(), s.queue.queueKey.Queue(queue)).Result()
+		s.NoError(err)
+		s.Equal(int64(0), mainCount)
+	})
+}
+
+func (s *QueueTestSuite) Test_RepopExpiredReservedJob() {
+	queue := "repop-expired"
+	reservedKey := s.queue.queueKey.Reserved(queue)
+
+	task := contractsqueue.Task{
+		UUID: "repop-uuid",
+		ChainJob: contractsqueue.ChainJob{
+			Job:  &MockJob{},
+			Args: testArgs,
+		},
+	}
+
+	s.NoError(s.queue.Push(task, queue))
+
+	// Simulate a crashed worker: pop once, leaving the reservation behind.
+	s.mockJobStorer.EXPECT().Get(task.Job.Signature()).Return(&MockJob{}, nil).Once()
+	job, err := s.queue.Pop(queue)
+	s.NoError(err)
+	s.Require().NotNil(job)
+	s.Equal(1, job.Attempts())
+
+	// Age the reservation past retry_after.
+	reserved, ok := job.(*ReservedJob)
+	s.Require().True(ok)
+	s.NoError(s.queue.client.ZAdd(s.ctx, reservedKey, redis.Z{
+		Score:  float64(carbon.Now().Timestamp() - int64(s.queue.retryAfter) - 1),
+		Member: reserved.jobRecordJson,
+	}).Err())
+
+	// The next Pop recovers the expired reservation with incremented attempts.
+	s.mockJobStorer.EXPECT().Get(task.Job.Signature()).Return(&MockJob{}, nil).Once()
+	job2, err := s.queue.Pop(queue)
+	s.NoError(err)
+	s.Require().NotNil(job2)
+	s.Equal(2, job2.Attempts())
+
+	// Verify the recovered job is now reserved again.
+	count, err := s.queue.client.ZCount(context.Background(), reservedKey, "-inf", "+inf").Result()
+	s.NoError(err)
+	s.Equal(int64(1), count)
+}
+
+func (s *QueueTestSuite) Test_Pop_Release_Repop() {
+	queue := "pop-release-repop"
+	queueKey := s.queue.queueKey.Queue(queue)
+	reservedKey := s.queue.queueKey.Reserved(queue)
+	delayedKey := s.queue.queueKey.Delayed(queue)
+
+	task := contractsqueue.Task{
+		UUID: "release-uuid",
+		ChainJob: contractsqueue.ChainJob{
+			Job:  &MockJob{},
+			Args: testArgs,
+		},
+	}
+
+	s.NoError(s.queue.Push(task, queue))
+
+	// First pop: attempts = 1.
+	s.mockJobStorer.EXPECT().Get(task.Job.Signature()).Return(&MockJob{}, nil).Once()
+	job, err := s.queue.Pop(queue)
+	s.NoError(err)
+	s.Require().NotNil(job)
+	s.Equal(1, job.Attempts())
+
+	// Release with no delay: the job moves from the reserved set to the delayed set.
+	s.NoError(job.Release(0))
+
+	count, err := s.queue.client.ZCount(context.Background(), reservedKey, "-inf", "+inf").Result()
+	s.NoError(err)
+	s.Equal(int64(0), count)
+
+	count, err = s.queue.client.ZCount(context.Background(), delayedKey, "-inf", "+inf").Result()
+	s.NoError(err)
+	s.Equal(int64(1), count)
+
+	count, err = s.queue.client.LLen(context.Background(), queueKey).Result()
+	s.NoError(err)
+	s.Equal(int64(0), count)
+
+	// Second pop: the released job is migrated back and attempts = 2.
+	s.mockJobStorer.EXPECT().Get(task.Job.Signature()).Return(&MockJob{}, nil).Once()
+	job2, err := s.queue.Pop(queue)
+	s.NoError(err)
+	s.Require().NotNil(job2)
+	s.Equal(2, job2.Attempts())
+
+	// Verify the job is reserved again.
+	count, err = s.queue.client.ZCount(context.Background(), reservedKey, "-inf", "+inf").Result()
+	s.NoError(err)
+	s.Equal(int64(1), count)
+
+	count, err = s.queue.client.ZCount(context.Background(), delayedKey, "-inf", "+inf").Result()
+	s.NoError(err)
+	s.Equal(int64(0), count)
 }
 
 func TestQueueKey(t *testing.T) {
