@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	contractsqueue "github.com/goravel/framework/contracts/queue"
 	"github.com/goravel/framework/foundation/json"
@@ -23,6 +24,7 @@ type ReservedJobTestSuite struct {
 	mockJobStorer    *mocksqueue.JobStorer
 	docker           *Docker
 	reservedQueueKey string
+	delayedQueueKey  string
 }
 
 func TestReservedJobTestSuite(t *testing.T) {
@@ -47,6 +49,7 @@ func (s *ReservedJobTestSuite) SetupSuite() {
 	s.docker = docker
 	s.mockJobStorer = mocksqueue.NewJobStorer(s.T())
 	s.reservedQueueKey = "test-reserved-queue"
+	s.delayedQueueKey = "test-delayed-queue"
 }
 
 func (s *ReservedJobTestSuite) TearDownSuite() {
@@ -65,15 +68,17 @@ func (s *ReservedJobTestSuite) TestNewReservedJob() {
 
 	s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
 
-	reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey)
+	reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
 	s.NoError(err)
 	s.NotNil(reservedJob)
 	s.Equal(s.ctx, reservedJob.ctx)
 	s.Equal(s.client, reservedJob.client)
 	s.Equal(s.reservedQueueKey, reservedJob.reservedQueueKey)
+	s.Equal(s.delayedQueueKey, reservedJob.delayedQueueKey)
 	s.Equal(jobRecord.Playload, reservedJob.jobRecord.Playload)
 	s.Equal(fmt.Sprintf("{\"playload\":\"{\\\"uuid\\\":\\\"865111de-ff50-4652-9733-72fea655f836\\\",\\\"signature\\\":\\\"mock\\\",\\\"args\\\":[{\\\"type\\\":\\\"[]string\\\",\\\"value\\\":[\\\"test\\\",\\\"test2\\\",\\\"test3\\\"]}],\\\"delay\\\":\\\"2025-05-28T19:50:57Z\\\"}\",\"attempts\":1,\"reserved_at\":\"%s\"}", carbon.Now().ToDateTimeString()), reservedJob.jobRecordJson)
 	s.Equal(1, reservedJob.jobRecord.Attempts)                                  // Should be incremented
+	s.Equal(1, reservedJob.Attempts())                                          // Contract method reflects the persisted count
 	s.Equal(carbon.NewDateTime(carbon.Now()), reservedJob.jobRecord.ReservedAt) // Should be set
 	s.Equal(s.mockJobStorer, reservedJob.jobStorer)
 	s.NotNil(reservedJob.json)
@@ -99,7 +104,7 @@ func (s *ReservedJobTestSuite) Test_Delete() {
 
 	s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
 
-	reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey)
+	reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
 	s.NoError(err)
 
 	count, err := s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
@@ -112,6 +117,103 @@ func (s *ReservedJobTestSuite) Test_Delete() {
 	count, err = s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
 	s.NoError(err)
 	s.Equal(int64(0), count)
+}
+
+func (s *ReservedJobTestSuite) Test_Attempts() {
+	jobRecord := JobRecord{
+		Playload: "{\"uuid\":\"865111de-ff50-4652-9733-72fea655f836\",\"signature\":\"mock\",\"args\":[{\"type\":\"[]string\",\"value\":[\"test\",\"test2\",\"test3\"]}],\"delay\":\"2025-05-28T19:50:57Z\"}",
+	}
+
+	s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
+
+	reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
+	s.NoError(err)
+	s.NotNil(reservedJob)
+	s.Equal(1, reservedJob.Attempts())
+}
+
+func (s *ReservedJobTestSuite) Test_Release() {
+	s.Run("release without delay", func() {
+		jobRecord := JobRecord{
+			Playload: "{\"uuid\":\"865111de-ff50-4652-9733-72fea655f836\",\"signature\":\"mock\",\"args\":[{\"type\":\"[]string\",\"value\":[\"test\",\"test2\",\"test3\"]}],\"delay\":\"2025-05-28T19:50:57Z\"}",
+		}
+
+		s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
+
+		reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
+		s.NoError(err)
+
+		count, err := s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		s.NoError(reservedJob.Release(0))
+
+		count, err = s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
+
+		count, err = s.client.ZCount(context.Background(), s.delayedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		score, err := s.client.ZScore(context.Background(), s.delayedQueueKey, reservedJob.jobRecordJson).Result()
+		s.NoError(err)
+		s.InDelta(float64(carbon.Now().Timestamp()), score, 1)
+	})
+
+	s.Run("release with delay", func() {
+		jobRecord := JobRecord{
+			Playload: "{\"uuid\":\"865111de-ff50-4652-9733-72fea655f836\",\"signature\":\"mock\",\"args\":[{\"type\":\"[]string\",\"value\":[\"test\",\"test2\",\"test3\"]}],\"delay\":\"2025-05-28T19:50:57Z\"}",
+		}
+
+		s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
+
+		reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
+		s.NoError(err)
+
+		s.NoError(reservedJob.Release(5 * time.Second))
+
+		count, err := s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
+
+		count, err = s.client.ZCount(context.Background(), s.delayedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		score, err := s.client.ZScore(context.Background(), s.delayedQueueKey, reservedJob.jobRecordJson).Result()
+		s.NoError(err)
+		s.InDelta(float64(carbon.Now().Timestamp())+5, score, 1)
+	})
+
+	s.Run("release with sub-second delay", func() {
+		jobRecord := JobRecord{
+			Playload: "{\"uuid\":\"865111de-ff50-4652-9733-72fea655f836\",\"signature\":\"mock\",\"args\":[{\"type\":\"[]string\",\"value\":[\"test\",\"test2\",\"test3\"]}],\"delay\":\"2025-05-28T19:50:57Z\"}",
+		}
+
+		s.mockJobStorer.EXPECT().Get("mock").Return(&MockJob{}, nil).Once()
+
+		reservedJob, err := NewReservedJob(s.ctx, s.client, jobRecord, s.mockJobStorer, json.New(), s.reservedQueueKey, s.delayedQueueKey)
+		s.NoError(err)
+
+		// The documented sub-second delay precision: the integer-second
+		// Timestamp() base plus the float64 fractional part gives a score
+		// of <seconds>.5 for a 500ms delay.
+		s.NoError(reservedJob.Release(500 * time.Millisecond))
+
+		count, err := s.client.ZCount(context.Background(), s.reservedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(0), count)
+
+		count, err = s.client.ZCount(context.Background(), s.delayedQueueKey, "-inf", "+inf").Result()
+		s.NoError(err)
+		s.Equal(int64(1), count)
+
+		score, err := s.client.ZScore(context.Background(), s.delayedQueueKey, reservedJob.jobRecordJson).Result()
+		s.NoError(err)
+		s.InDelta(float64(carbon.Now().Timestamp())+0.5, score, 1)
+	})
 }
 
 func TestJobRecord(t *testing.T) {

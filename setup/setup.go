@@ -33,6 +33,7 @@ func main() {
         "driver": "custom",
         "connection": "default",
         "queue": "default",
+        "retry_after": 60,
         "via": func() (queue.Driver, error) {
             return redisfacades.Queue("redis") // The ` + "`redis`" + ` value is the key of ` + "`connections`" + `
         },
