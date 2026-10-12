@@ -2,7 +2,7 @@ module github.com/goravel/redis
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require (
 	github.com/goravel/framework v1.18.1-0.20261004012552-fb354e7fee1e
