@@ -156,8 +156,14 @@ func (s *CacheTestSuite) TestTagsAdd() {
 	s.True(s.cache.Flush())
 
 	s.True(s.cache.Tags("a").Add("key", "first", time.Minute))
-	s.False(s.cache.Tags("a").Add("key", "second", time.Minute))
+	itemKey := s.cache.key(s.cache.Tags("a").(*taggedCache).itemKey("key"))
+	score := s.cache.instance.ZScore(s.ctx(), s.tagKey("a"), itemKey).Val()
+	s.Greater(score, float64(0))
+
+	// A failed add leaves the item and its tag entry alone.
+	s.False(s.cache.Tags("a").Add("key", "second", 0))
 	s.Equal("first", s.cache.Tags("a").Get("key"))
+	s.Equal(score, s.cache.instance.ZScore(s.ctx(), s.tagKey("a"), itemKey).Val())
 
 	s.True(s.cache.Tags("a").Flush())
 	s.False(s.cache.Tags("a").Has("key"))
@@ -190,7 +196,7 @@ func (s *CacheTestSuite) TestTagsIncrementAndDecrement() {
 
 	s.NoError(s.cache.Tags("counters").Put("name", "goravel", time.Minute))
 	_, err = s.cache.Tags("counters").Increment("name")
-	s.Error(err)
+	s.ErrorContains(err, "value is not an integer")
 }
 
 func (s *CacheTestSuite) TestTagsForgetAndPull() {
@@ -211,9 +217,9 @@ func (s *CacheTestSuite) TestTagsForgetAndPull() {
 func (s *CacheTestSuite) TestTagsExpiration() {
 	s.True(s.cache.Flush())
 
-	s.NoError(s.cache.Tags("a").Put("key", "value", time.Second))
+	s.NoError(s.cache.Tags("a").Put("key", "value", 500*time.Millisecond))
 	s.True(s.cache.Tags("a").Has("key"))
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	s.False(s.cache.Tags("a").Has("key"))
 
 	// The next write drops the stale entry, a forever one stays.
@@ -274,7 +280,8 @@ func (s *CacheTestSuite) tagKey(name string) string {
 }
 
 func TestTagNamespace(t *testing.T) {
-	assert.Equal(t, tagNamespace([]string{"a", "b"}), tagNamespace([]string{"a", "b"}))
+	// sha1("1:a1:b"), pins the length-prefixed format.
+	assert.Equal(t, "95253b90414f24c679779b57f9eb73d08de34a87", tagNamespace([]string{"a", "b"}))
 	assert.NotEqual(t, tagNamespace([]string{"a", "b"}), tagNamespace([]string{"b", "a"}))
 	assert.NotEqual(t, tagNamespace([]string{"ab"}), tagNamespace([]string{"a", "b"}))
 	assert.NotEqual(t, tagNamespace([]string{"a|b"}), tagNamespace([]string{"a", "b"}))
