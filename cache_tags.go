@@ -50,6 +50,8 @@ func tagNamespace(names []string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+var _ contractscache.Repository = &taggedCache{}
+
 // taggedCache is the tagged view of Cache returned by Tags.
 type taggedCache struct {
 	cache        *Cache
@@ -59,17 +61,17 @@ type taggedCache struct {
 }
 
 func (r *taggedCache) Add(key string, value any, t time.Duration) bool {
-	if !r.cache.Add(r.itemKey(key), value, t) {
-		return false
-	}
-
+	var added *redis.BoolCmd
 	_, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
-		r.register(pipe, key, t, false)
+		// Keep the entry of an item that already exists, its expiration does not change.
+		// A new item has no live entry, since the expired ones are dropped first.
+		r.register(pipe, key, t, true)
+		added = pipe.SetNX(r.cache.ctx, r.cache.key(r.itemKey(key)), value, t)
 
 		return nil
 	})
 
-	return err == nil
+	return err == nil && added.Val()
 }
 
 func (r *taggedCache) Decrement(key string, value ...int64) (int64, error) {
@@ -225,7 +227,9 @@ func (r *taggedCache) Increment(key string, value ...int64) (int64, error) {
 
 	var res *redis.IntCmd
 	if _, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
-		// Keep the entry of an existing item, a counter keeps its expiration.
+		// INCRBY keeps the TTL of an existing counter, so its tag entry keeps the
+		// original score: rewriting it as forever (t = 0) would keep an expiring
+		// counter in the index after it is gone. A new counter never expires.
 		r.register(pipe, key, 0, true)
 		res = pipe.IncrBy(r.cache.ctx, r.cache.key(r.itemKey(key)), value[0])
 
