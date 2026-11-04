@@ -68,11 +68,22 @@ func (s *CacheTestSuite) TestTagsFlushRemovesItemsOfAnyTag() {
 	s.Equal("Bob", s.cache.Tags("authors").Get("bob"))
 	s.Equal("Tom", s.cache.Tags("other").Get("tom"))
 	s.Equal("Plain", s.cache.Get("plain"))
-	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.cache.key("tag:people:entries")).Val())
+	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.tagKey("people")).Val())
 
 	// The flushed tag can be used again.
 	s.True(s.cache.Tags("people").Forever("anne", "Anne"))
 	s.Equal("Anne", s.cache.Tags("people").Get("anne"))
+}
+
+func (s *CacheTestSuite) TestTagsIndexDoesNotCollideWithApplicationKeys() {
+	s.True(s.cache.Flush())
+
+	s.True(s.cache.Forever("tag:people:entries", "app"))
+	s.True(s.cache.Tags("people").Forever("john", "John"))
+	s.True(s.cache.Tags("people").Flush())
+
+	s.Nil(s.cache.Tags("people").Get("john"))
+	s.Equal("app", s.cache.Get("tag:people:entries"))
 }
 
 func (s *CacheTestSuite) TestTagsFlushInChunks() {
@@ -181,8 +192,8 @@ func (s *CacheTestSuite) TestTagsForgetAndPull() {
 	s.True(s.cache.Tags("a", "b").Forever("key", "value"))
 	s.True(s.cache.Tags("a", "b").Forget("key"))
 	s.False(s.cache.Tags("a", "b").Has("key"))
-	s.Equal(int64(0), s.cache.instance.ZCard(s.ctx(), s.cache.key("tag:a:entries")).Val())
-	s.Equal(int64(0), s.cache.instance.ZCard(s.ctx(), s.cache.key("tag:b:entries")).Val())
+	s.Equal(int64(0), s.cache.instance.ZCard(s.ctx(), s.tagKey("a")).Val())
+	s.Equal(int64(0), s.cache.instance.ZCard(s.ctx(), s.tagKey("b")).Val())
 
 	s.True(s.cache.Tags("a").Forever("key", "value"))
 	s.Equal("value", s.cache.Tags("a").Pull("key"))
@@ -200,7 +211,7 @@ func (s *CacheTestSuite) TestTagsExpiration() {
 
 	// The next write drops the stale entry, a forever one stays.
 	s.True(s.cache.Tags("a").Forever("other", "value"))
-	entries, err := s.cache.instance.ZRangeWithScores(s.ctx(), s.cache.key("tag:a:entries"), 0, -1).Result()
+	entries, err := s.cache.instance.ZRangeWithScores(s.ctx(), s.tagKey("a"), 0, -1).Result()
 	s.NoError(err)
 	s.Len(entries, 1)
 	s.Equal(s.cache.key(s.cache.Tags("a").(*taggedCache).itemKey("other")), entries[0].Member)
@@ -244,11 +255,15 @@ func (s *CacheTestSuite) TestTagsStoreFlush() {
 	s.True(s.cache.Flush())
 
 	s.False(s.cache.Tags("a").Has("key"))
-	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.cache.key("tag:a:entries")).Val())
+	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.tagKey("a")).Val())
 }
 
 func (s *CacheTestSuite) ctx() context.Context {
 	return s.cache.ctx
+}
+
+func (s *CacheTestSuite) tagKey(name string) string {
+	return s.cache.Tags().(*taggedCache).tagKey(name)
 }
 
 func TestTagNamespace(t *testing.T) {
@@ -264,5 +279,5 @@ func TestTagsKeys(t *testing.T) {
 	tagged := cache.Tags("people").(*taggedCache)
 
 	assert.Equal(t, tagNamespace([]string{"people"})+":john", tagged.itemKey("john"))
-	assert.Equal(t, "goravel_cache:tag:people:entries", tagged.tagKey("people"))
+	assert.Equal(t, "goravel_cache:tag:465d4ae24cac06daecf97e3b106cfbc34559b7e7:entries", tagged.tagKey("people"))
 }

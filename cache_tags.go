@@ -214,9 +214,10 @@ func (r *taggedCache) itemKey(key string) string {
 	return r.namespace + ":" + key
 }
 
-// tagKey is the sorted set holding the item keys stored under a tag.
+// tagKey is the sorted set holding the item keys stored under a tag. The name
+// is hashed so the index cannot collide with an application key.
 func (r *taggedCache) tagKey(name string) string {
-	return r.cache.key("tag:" + name + ":entries")
+	return r.cache.key("tag:" + tagNamespace([]string{name}) + ":entries")
 }
 
 // register queues the item key into the entries of every tag, scored by its
