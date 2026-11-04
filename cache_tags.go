@@ -3,8 +3,11 @@ package redis
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	contractscache "github.com/goravel/framework/contracts/cache"
@@ -24,10 +27,14 @@ const foreverScore = -1
 // Every tag keeps a sorted set of the keys stored under it, scored by their
 // expiration time, so a flush only deletes the items of that tag.
 func (r *Cache) Tags(names ...string) contractscache.Repository {
+	// Marshaling a string slice cannot fail.
+	encodedNames, _ := json.Marshal(names)
+
 	return &taggedCache{
-		cache:     r,
-		names:     slices.Clone(names),
-		namespace: tagNamespace(names),
+		cache:        r,
+		names:        slices.Clone(names),
+		namespace:    tagNamespace(names),
+		encodedNames: string(encodedNames),
 	}
 }
 
@@ -45,9 +52,10 @@ func tagNamespace(names []string) string {
 
 // taggedCache is the tagged view of Cache returned by Tags.
 type taggedCache struct {
-	cache     *Cache
-	names     []string
-	namespace string
+	cache        *Cache
+	names        []string
+	namespace    string
+	encodedNames string
 }
 
 func (r *taggedCache) Add(key string, value any, t time.Duration) bool {
@@ -90,10 +98,13 @@ func (r *taggedCache) Forget(key string) bool {
 	return err == nil
 }
 
-// Flush removes every item stored under any of the tags.
+// Flush removes every item stored under any of the tags, and drops those items
+// from the indexes of their other tags.
 func (r *taggedCache) Flush() bool {
 	for _, name := range r.names {
 		tagKey := r.tagKey(name)
+		// The tag lists of the namespaces met while flushing this tag.
+		namespaces := make(map[string][]string)
 		for start := int64(0); ; start += tagFlushChunk {
 			itemKeys, err := r.cache.instance.ZRange(r.cache.ctx, tagKey, start, start+tagFlushChunk-1).Result()
 			if err != nil {
@@ -103,10 +114,19 @@ func (r *taggedCache) Flush() bool {
 				break
 			}
 
-			// Delete the keys one by one, a multi-key DEL fails on a cluster when they live in different slots.
+			if !r.loadNames(itemKeys, namespaces) {
+				return false
+			}
+
+			// Unlink the keys one by one, a multi-key command fails on a cluster when they live in different slots.
 			if _, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
 				for _, itemKey := range itemKeys {
-					pipe.Del(r.cache.ctx, itemKey)
+					pipe.Unlink(r.cache.ctx, itemKey)
+					for _, sibling := range namespaces[r.namespaceOf(itemKey)] {
+						if sibling != name {
+							pipe.ZRem(r.cache.ctx, r.tagKey(sibling), itemKey)
+						}
+					}
 				}
 
 				return nil
@@ -114,14 +134,61 @@ func (r *taggedCache) Flush() bool {
 				return false
 			}
 
+			// The set is not changed while it is read, so the next chunk starts right after this one.
 			if len(itemKeys) < tagFlushChunk {
 				break
 			}
 		}
 
-		if err := r.cache.instance.Del(r.cache.ctx, tagKey).Err(); err != nil {
+		if _, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
+			pipe.Unlink(r.cache.ctx, tagKey)
+			// Every item of these namespaces carries the flushed tag, so none of them is left.
+			for namespace := range namespaces {
+				pipe.Unlink(r.cache.ctx, r.namesKey(namespace))
+			}
+
+			return nil
+		}); err != nil {
 			return false
 		}
+	}
+
+	return true
+}
+
+// loadNames reads the tag lists of the namespaces of the item keys that are not
+// known yet. A namespace without a stored list has a single tag.
+func (r *taggedCache) loadNames(itemKeys []string, namespaces map[string][]string) bool {
+	cmds := make(map[string]*redis.StringCmd)
+	if _, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
+		for _, itemKey := range itemKeys {
+			namespace := r.namespaceOf(itemKey)
+			if _, ok := namespaces[namespace]; ok || namespace == "" {
+				continue
+			}
+			if _, ok := cmds[namespace]; !ok {
+				cmds[namespace] = pipe.Get(r.cache.ctx, r.namesKey(namespace))
+			}
+		}
+
+		return nil
+	}); err != nil && !errors.Is(err, redis.Nil) {
+		return false
+	}
+
+	for namespace, cmd := range cmds {
+		raw, err := cmd.Result()
+		if errors.Is(err, redis.Nil) {
+			namespaces[namespace] = nil
+			continue
+		}
+		if err != nil {
+			return false
+		}
+
+		var names []string
+		_ = json.Unmarshal([]byte(raw), &names)
+		namespaces[namespace] = names
 	}
 
 	return true
@@ -220,6 +287,27 @@ func (r *taggedCache) tagKey(name string) string {
 	return r.cache.key("tag:" + tagNamespace([]string{name}) + ":entries")
 }
 
+// namesKey holds the tag list of a namespace, so a flush of one tag can find
+// the other tags of an item. A single-tag namespace has none.
+func (r *taggedCache) namesKey(namespace string) string {
+	return r.cache.key("tag:" + namespace + ":names")
+}
+
+// namespaceOf returns the tag namespace of a full item key, or "" when the key
+// does not have one.
+func (r *taggedCache) namespaceOf(itemKey string) string {
+	if r.cache.prefix != "" {
+		itemKey = strings.TrimPrefix(itemKey, r.cache.prefix+":")
+	}
+
+	namespace, _, found := strings.Cut(itemKey, ":")
+	if !found || len(namespace) != sha1.Size*2 {
+		return ""
+	}
+
+	return namespace
+}
+
 // register queues the item key into the entries of every tag, scored by its
 // expiration time, and drops the entries that have already expired.
 func (r *taggedCache) register(pipe redis.Pipeliner, key string, t time.Duration, onlyNew bool) {
@@ -227,6 +315,10 @@ func (r *taggedCache) register(pipe redis.Pipeliner, key string, t time.Duration
 	score := float64(foreverScore)
 	if t > 0 {
 		score = float64(now.Add(t).UnixMilli())
+	}
+
+	if len(r.names) > 1 {
+		pipe.Set(r.cache.ctx, r.namesKey(r.namespace), r.encodedNames, 0)
 	}
 
 	entry := redis.Z{Score: score, Member: r.cache.key(r.itemKey(key))}

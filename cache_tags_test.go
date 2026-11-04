@@ -70,6 +70,13 @@ func (s *CacheTestSuite) TestTagsFlushRemovesItemsOfAnyTag() {
 	s.Equal("Plain", s.cache.Get("plain"))
 	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.tagKey("people")).Val())
 
+	// The flushed item is dropped from its other tags too, together with its tag list.
+	authors, err := s.cache.instance.ZRange(s.ctx(), s.tagKey("authors"), 0, -1).Result()
+	s.NoError(err)
+	s.Equal([]string{s.cache.key(s.cache.Tags("authors").(*taggedCache).itemKey("bob"))}, authors)
+	tagged := s.cache.Tags("people", "authors").(*taggedCache)
+	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), tagged.namesKey(tagged.namespace)).Val())
+
 	// The flushed tag can be used again.
 	s.True(s.cache.Tags("people").Forever("anne", "Anne"))
 	s.Equal("Anne", s.cache.Tags("people").Get("anne"))
@@ -280,4 +287,8 @@ func TestTagsKeys(t *testing.T) {
 
 	assert.Equal(t, tagNamespace([]string{"people"})+":john", tagged.itemKey("john"))
 	assert.Equal(t, "goravel_cache:tag:465d4ae24cac06daecf97e3b106cfbc34559b7e7:entries", tagged.tagKey("people"))
+	assert.Equal(t, "goravel_cache:tag:465d4ae24cac06daecf97e3b106cfbc34559b7e7:names", tagged.namesKey(tagged.namespace))
+	assert.Equal(t, tagged.namespace, tagged.namespaceOf(cache.key(tagged.itemKey("john:doe"))))
+	assert.Equal(t, "", tagged.namespaceOf(cache.key("plain")))
+	assert.Equal(t, "", tagged.namespaceOf("other:"+tagged.itemKey("john")))
 }
