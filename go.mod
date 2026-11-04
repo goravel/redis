@@ -70,7 +70,9 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
-	google.golang.org/grpc v1.86.0-dev.0.20261023181330-80c1e76a540c // indirect
+	google.golang.org/grpc v1.86.0-dev.0.20261029074820-bc90736a6fad // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gorm.io/gorm v1.31.2 // indirect
 )
+
+replace github.com/goravel/framework => github.com/JGamboa/framework v1.18.1-0.20261104024648-07d86d888d82
