@@ -107,13 +107,22 @@ func (r *taggedCache) Flush() bool {
 		tagKey := r.tagKey(name)
 		// The tag lists of the namespaces met while flushing this tag.
 		namespaces := make(map[string][]string)
-		for start := int64(0); ; start += tagFlushChunk {
-			itemKeys, err := r.cache.instance.ZRange(r.cache.ctx, tagKey, start, start+tagFlushChunk-1).Result()
+		// Pop the entries instead of reading them, so an item tagged while the
+		// flush runs is either flushed or kept in the index, never dropped from it.
+		for {
+			entries, err := r.cache.instance.ZPopMin(r.cache.ctx, tagKey, tagFlushChunk).Result()
 			if err != nil {
 				return false
 			}
-			if len(itemKeys) == 0 {
+			if len(entries) == 0 {
 				break
+			}
+
+			itemKeys := make([]string, 0, len(entries))
+			for _, entry := range entries {
+				if itemKey, ok := entry.Member.(string); ok {
+					itemKeys = append(itemKeys, itemKey)
+				}
 			}
 
 			if !r.loadNames(itemKeys, namespaces) {
@@ -136,15 +145,13 @@ func (r *taggedCache) Flush() bool {
 				return false
 			}
 
-			// The set is not changed while it is read, so the next chunk starts right after this one.
-			if len(itemKeys) < tagFlushChunk {
+			if len(entries) < tagFlushChunk {
 				break
 			}
 		}
 
+		// Every item of these namespaces carries the flushed tag, so none of them is left.
 		if _, err := r.cache.instance.Pipelined(r.cache.ctx, func(pipe redis.Pipeliner) error {
-			pipe.Unlink(r.cache.ctx, tagKey)
-			// Every item of these namespaces carries the flushed tag, so none of them is left.
 			for namespace := range namespaces {
 				pipe.Unlink(r.cache.ctx, r.namesKey(namespace))
 			}
@@ -189,7 +196,9 @@ func (r *taggedCache) loadNames(itemKeys []string, namespaces map[string][]strin
 		}
 
 		var names []string
-		_ = json.Unmarshal([]byte(raw), &names)
+		if err := json.Unmarshal([]byte(raw), &names); err != nil {
+			return false
+		}
 		namespaces[namespace] = names
 	}
 
@@ -292,9 +301,10 @@ func (r *taggedCache) tagKey(name string) string {
 }
 
 // namesKey holds the tag list of a namespace, so a flush of one tag can find
-// the other tags of an item. A single-tag namespace has none.
+// the other tags of an item. A single-tag namespace has none. The name is
+// hashed so the list cannot collide with an application key.
 func (r *taggedCache) namesKey(namespace string) string {
-	return r.cache.key("tag:" + namespace + ":names")
+	return r.cache.key("tag:" + tagNamespace([]string{"names", namespace}) + ":names")
 }
 
 // namespaceOf returns the tag namespace of a full item key, or "" when the key
