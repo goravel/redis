@@ -91,6 +91,17 @@ func (s *CacheTestSuite) TestTagsIndexDoesNotCollideWithApplicationKeys() {
 
 	s.Nil(s.cache.Tags("people").Get("john"))
 	s.Equal("app", s.cache.Get("tag:people:entries"))
+
+	// The tag list of a namespace cannot be replaced by an application key either.
+	tagged := s.cache.Tags("people", "authors").(*taggedCache)
+	listKey := "tag:" + tagged.namespace + ":names"
+	s.True(s.cache.Forever(listKey, "app"))
+	s.True(tagged.Forever("anne", "Anne"))
+	s.True(s.cache.Tags("people").Flush())
+
+	s.Nil(tagged.Get("anne"))
+	s.Equal(int64(0), s.cache.instance.Exists(s.ctx(), s.tagKey("authors")).Val())
+	s.Equal("app", s.cache.Get(listKey))
 }
 
 func (s *CacheTestSuite) TestTagsFlushInChunks() {
@@ -194,6 +205,16 @@ func (s *CacheTestSuite) TestTagsIncrementAndDecrement() {
 	s.NoError(err)
 	s.Equal(int64(-1), res)
 
+	// Incrementing keeps the tag entry of an expiring counter.
+	s.NoError(s.cache.Tags("counters").Put("expiring", 1, time.Minute))
+	itemKey := s.cache.key(s.cache.Tags("counters").(*taggedCache).itemKey("expiring"))
+	score, err := s.cache.instance.ZScore(s.ctx(), s.tagKey("counters"), itemKey).Result()
+	s.NoError(err)
+	s.Positive(score)
+	_, err = s.cache.Tags("counters").Increment("expiring")
+	s.NoError(err)
+	s.Equal(score, s.cache.instance.ZScore(s.ctx(), s.tagKey("counters"), itemKey).Val())
+
 	s.NoError(s.cache.Tags("counters").Put("name", "goravel", time.Minute))
 	_, err = s.cache.Tags("counters").Increment("name")
 	s.ErrorContains(err, "value is not an integer")
@@ -294,7 +315,7 @@ func TestTagsKeys(t *testing.T) {
 
 	assert.Equal(t, tagNamespace([]string{"people"})+":john", tagged.itemKey("john"))
 	assert.Equal(t, "goravel_cache:tag:465d4ae24cac06daecf97e3b106cfbc34559b7e7:entries", tagged.tagKey("people"))
-	assert.Equal(t, "goravel_cache:tag:465d4ae24cac06daecf97e3b106cfbc34559b7e7:names", tagged.namesKey(tagged.namespace))
+	assert.Equal(t, "goravel_cache:tag:c33a76b90aed851d6922935ede8343c0344a3c62:names", tagged.namesKey(tagged.namespace))
 	assert.Equal(t, tagged.namespace, tagged.namespaceOf(cache.key(tagged.itemKey("john:doe"))))
 	assert.Equal(t, "", tagged.namespaceOf(cache.key("plain")))
 	assert.Equal(t, "", tagged.namespaceOf("other:"+tagged.itemKey("john")))
