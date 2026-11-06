@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.27.3
 
 require (
-	github.com/goravel/framework v1.18.1-0.20261101081630-7419fac3af06
+	github.com/goravel/framework v1.18.1-0.20261105034705-3bb9386510c4
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.12.1
@@ -74,5 +74,3 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gorm.io/gorm v1.31.2 // indirect
 )
-
-replace github.com/goravel/framework => github.com/JGamboa/framework v1.18.1-0.20261104024648-07d86d888d82
