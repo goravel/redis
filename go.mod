@@ -5,10 +5,12 @@ go 1.26.0
 toolchain go1.27.4
 
 require (
-	github.com/goravel/framework v1.18.1-0.20261109031812-9d9468472b17
+	github.com/dave/dst v0.28.0
+	github.com/goravel/framework v1.18.1-0.20261125034939-9193b0c282e1
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.12.1
+	github.com/subosito/gotenv v1.6.0
 )
 
 require (
@@ -30,7 +32,6 @@ require (
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/containerd/console v1.0.5 // indirect
-	github.com/dave/dst v0.28.0 // indirect
 	github.com/dromara/carbon/v2 v2.6.17 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
@@ -61,16 +62,16 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/exp v0.0.0-20261106192419-47ce03d25ef0 // indirect
-	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
-	golang.org/x/tools v0.52.1-0.20261106145633-d407941a339a // indirect
+	golang.org/x/exp v0.0.0-20261121134650-e1094eeca1b5 // indirect
+	golang.org/x/mod v0.43.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
+	golang.org/x/tools v0.53.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
-	google.golang.org/grpc v1.86.0-dev.0.20261104142343-cbf30c413099 // indirect
+	google.golang.org/grpc v1.86.0-dev.0.20261122155159-341c59808a9a // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gorm.io/gorm v1.31.2 // indirect
 )
